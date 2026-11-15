@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Radar de noticias de Bolivia</title>
-  
+
 
 <style>
 :root{--bg:#e3e4e8;--panel:#ffffff;--tx:#1f2029;--mut:#62646f;--bd:#cdd0d7;--ac:#3b2c78;--btn:#32266b;--soft:#eceef2;
@@ -101,13 +101,13 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
 #err{display:none;background:#fff4e6;color:#7a3e00;border:1px solid #ffd8a8;border-radius:6px;padding:12px 16px;margin:16px 0}
 #err code{background:#ffe8cc;padding:1px 6px;border-radius:4px}
 </style>
-  
+
 </head>
 <body>
 <header class="hero"><div class="wrap">
   <div class="top"><div>
     <h1>Radar de noticias de Bolivia</h1>
-    <p>Busca un tema y descubre qué publican los medios bolivianos, cómo lo cubre cada uno y quién marca la agenda. Datos obtenidos por web scraping y analizados con minería de contenido, de estructura y de uso.</p>
+    <p>Busca un tema y descubre qué publican los medios bolivianos, cómo lo cubre cada uno y quién marca la agenda.</p>
   </div><div class="acc"><button class="theme" id="tema">Cambiar tema</button><button class="theme" id="recargar">Actualizar datos</button><span id="estado"></span></div></div>
 </div></header>
 <div class="wrap">
@@ -127,7 +127,6 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
     <div class="grid2">
       <div class="card">
         <h2>Pregúntale a las noticias</h2>
-        <p class="sub">Escribe un tema con tus palabras. La búsqueda entiende plurales y variantes (incendio / incendios).</p>
         <div id="filtros"></div>
         <div id="msgs"></div>
         <div class="ask"><input id="q" placeholder="Ej.: incendio en la Chiquitania, caso maletas, reservas de gas…" autocomplete="off"><button class="btn" id="go">Buscar</button></div>
@@ -180,7 +179,6 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
 
   <section class="panel" id="bitacora">
     <div class="card"><h2>Bitácora automática del proyecto</h2>
-      <p class="sub">Registro de pasos, cambios en el código (con el fragmento modificado) y corridas de extracción. Se genera sola cada vez que se ejecuta el proyecto.</p>
       <div id="ultima"></div>
       <label>Tipo: <select id="ftipo"><option value="">todos</option><option>linea_base</option><option>cambio</option><option>corrida</option><option>paso</option></select></label>
       <div class="tw"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Sección</th><th>Archivo</th><th>Motivo</th><th>Fragmento</th><th>Efecto</th></tr></thead><tbody id="bitbody"></tbody></table></div>
@@ -188,10 +186,6 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
   </section>
 
   <section class="panel" id="origen">
-    <div class="card"><h2>Problema que resuelve</h2>
-      <p>Nadie lee cinco periódicos al día. Este radar reúne las noticias de varios medios bolivianos en un solo lugar, permite buscar por tema, agrupa las que cuentan el mismo hecho y muestra qué medio lo publicó primero, siempre con enlace a la fuente original.</p>
-      <div class="steps" id="pasos"></div>
-    </div>
     <div class="card"><h2>Origen de los datos</h2><p class="sub" id="orfecha"></p><div class="tw"><table><thead><tr><th>Medio</th><th>Sitio</th><th>Pausa</th><th>Condiciones (robots.txt)</th></tr></thead><tbody id="orbody"></tbody></table></div></div>
     <div class="card"><h2>Las tres minerías web aplicadas</h2><div class="tw"><table><thead><tr><th>Tipo</th><th>Qué se hizo</th><th>Dónde se ve</th></tr></thead><tbody>
       <tr><td><b>Contenido</b></td><td>Web scraping con rvest, limpieza, raíces de palabras, TF-IDF, similitud del coseno, PCA, resumen extractivo</td><td>Asistente, Mapa, Historias</td></tr>

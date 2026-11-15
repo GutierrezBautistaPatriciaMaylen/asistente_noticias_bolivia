@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar de noticias de Bolivia</title>
+<style>
+:root{--bg:#edf0f5;--panel:#fff;--tx:#1a2233;--mut:#5b6980;--bd:#d3d9e4;--ac:#1f3a6e;--btn:#1f3a6e;--soft:#e8edf5;
+  --sh:0 1px 2px rgba(15,33,71,.06);--hero:#0f2147;--foot:#1f3a6e}
+:root[data-theme=dark]{--bg:#0b1426;--panel:#111c33;--tx:#e4e9f3;--mut:#98a6c1;--bd:#22304f;--ac:#7ea6e6;--btn:#2d5aa3;--soft:#162340;
+  --sh:0 1px 2px rgba(0,0,0,.35);--hero:#08112a;--foot:#7ea6e6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5}
+a{color:var(--ac)}
+h1,h2,h3{font-family:Georgia,"Times New Roman",serif;font-weight:700}
+.wrap{max-width:1180px;margin:0 auto;padding:0 18px}
+.hero{background:var(--hero);color:#fff;padding:26px 0 72px;border-bottom:3px solid #3b6fc4}
+.hero h1{margin:0;font-size:2rem;letter-spacing:0}
+.hero p{margin:8px 0 0;opacity:.82;max-width:720px}
+.top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+.acc{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.theme{background:transparent;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:6px 14px;cursor:pointer;font-size:.85rem}
+.theme:hover{background:rgba(255,255,255,.1)}
+.theme:disabled{opacity:.6;cursor:wait}
+#estado{font-size:.78rem;opacity:.8;text-align:right;max-width:220px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:-50px}
+.kpi{background:var(--panel);border:1px solid var(--bd);border-top:3px solid var(--ac);border-radius:4px;padding:12px 16px;box-shadow:var(--sh)}
+.kpi b{display:block;font-family:Georgia,"Times New Roman",serif;font-size:1.6rem;line-height:1.15}
+.kpi span{color:var(--mut);font-size:.8rem}
+nav{display:flex;gap:2px;overflow-x:auto;margin-top:18px;position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--bd)}
+nav button{white-space:nowrap;border:0;border-bottom:3px solid transparent;background:none;color:var(--mut);padding:12px 16px;cursor:pointer;font-size:.92rem;font-weight:600}
+nav button:hover{color:var(--tx)}
+nav button.on{color:var(--ac);border-bottom-color:var(--ac)}
+.panel{display:none;padding:18px 0 40px}
+.panel.on{display:block}
+.card{background:var(--panel);border:1px solid var(--bd);border-radius:6px;padding:18px;box-shadow:var(--sh);margin-bottom:16px}
+h2{margin:0 0 4px;font-size:1.25rem}
+h3{margin:0 0 6px;font-size:1.05rem}
+.sub{color:var(--mut);font-size:.9rem;margin:0 0 12px}
+.grid2{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:16px;align-items:start}
+.g11{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px;align-items:start}
+.grid3{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr);gap:16px;align-items:start}
+@media(max-width:860px){.grid2,.grid3,.g11{grid-template-columns:1fr}.top{flex-direction:column}.acc{align-items:flex-start}}
+.badge{display:inline-block;color:#fff;border-radius:3px;padding:1px 9px;font-size:.74rem;font-weight:600;white-space:nowrap}
+.chip{border:1px solid var(--bd);background:var(--soft);color:var(--tx);border-radius:4px;padding:4px 12px;margin:3px 4px 3px 0;cursor:pointer;font-size:.84rem}
+.chip:hover{border-color:var(--ac)}
+.chip.on{background:var(--btn);color:#fff;border-color:var(--btn)}
+.note{background:var(--soft);border-left:4px solid var(--ac);border-radius:4px;padding:9px 12px;font-size:.86rem;color:var(--mut);margin:10px 0}
+.warn{border-left-color:#b7791f}
+#msgs{min-height:260px;max-height:58vh;overflow-y:auto;display:flex;flex-direction:column;gap:12px;padding:4px 2px}
+.msg{max-width:96%;padding:10px 14px;border-radius:6px}
+.user{align-self:flex-end;background:var(--btn);color:#fff}
+.bot{align-self:flex-start;background:var(--bg);border:1px solid var(--bd)}
+.bot p{margin:4px 0}
+.res{display:block;text-decoration:none;color:inherit;border:1px solid var(--bd);background:var(--panel);border-radius:6px;padding:10px 12px;margin:8px 0}
+.res:hover{border-color:var(--ac)}
+.meta{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:.78rem;color:var(--mut);margin-bottom:3px}
+.ttl{font-weight:600}
+.ext{font-size:.86rem;color:var(--mut);margin-top:3px}
+.ask{display:flex;gap:8px;margin-top:12px}
+.ask input,select{flex:1;padding:11px 14px;border-radius:6px;border:1px solid var(--bd);background:var(--bg);color:var(--tx);font-size:1rem}
+select{flex:none;padding:8px 10px;font-size:.9rem}
+.btn{background:var(--btn);color:#fff;border:0;border-radius:6px;padding:0 22px;cursor:pointer;font-size:1rem;min-height:44px}
+.btn.sec{background:var(--soft);color:var(--tx);border:1px solid var(--bd);min-height:0;padding:6px 14px;font-size:.85rem}
+.ck{display:inline-flex;gap:6px;align-items:center;margin:3px 10px 3px 0;font-size:.88rem;cursor:pointer}
+.hl{max-height:600px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px}
+.hi{border:1px solid var(--bd);border-radius:6px;padding:10px 12px;cursor:pointer;background:var(--panel)}
+.hi:hover{border-color:var(--ac)}
+.hi.on{border-color:var(--ac);background:var(--soft)}
+.hi .t{font-weight:600;font-size:.92rem}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.col{border:1px solid var(--bd);border-radius:6px;padding:10px;background:var(--bg)}
+.col a{display:block;text-decoration:none;color:inherit;font-size:.85rem;margin:6px 0;padding-bottom:6px;border-bottom:1px dashed var(--bd)}
+.col a:hover{color:var(--ac)}
+.col small{color:var(--mut)}
+svg{max-width:100%;height:auto;display:block}
+svg text{font-family:inherit;fill:var(--tx)}
+svg .mut{fill:var(--mut)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.86rem}
+th,td{text-align:left;padding:8px;border-bottom:1px solid var(--bd);vertical-align:top}
+th{color:var(--mut);font-weight:600;font-size:.78rem;text-transform:uppercase;letter-spacing:.03em}
+.bar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:.85rem}
+.bar .l{width:150px;flex:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar .tr{flex:1;background:var(--soft);border-radius:3px;height:14px;overflow:hidden}
+.bar .tr i{display:block;height:100%;border-radius:3px}
+.bar .v{width:40px;text-align:right;color:var(--mut)}
+.heat{display:grid;gap:4px;font-size:.8rem}
+.heat div{padding:8px 4px;border-radius:4px;text-align:center}
+.heat .h{color:var(--mut);font-weight:600;font-size:.74rem;background:none}
+.tag{padding:1px 8px;border-radius:3px;font-size:.74rem;background:var(--soft);border:1px solid var(--bd)}
+pre{white-space:pre-wrap;word-break:break-word;max-width:420px;font-size:.76rem;margin:4px 0 0}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#0f2147;color:#fff;border-radius:4px;padding:6px 10px;font-size:.8rem;max-width:300px;white-space:pre-line;box-shadow:0 6px 20px rgba(0,0,0,.35)}
+#tip[hidden]{display:none}
+.steps{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.steps span{background:var(--soft);border:1px solid var(--bd);border-radius:4px;padding:6px 12px;font-size:.85rem}
+.steps i{color:var(--mut);font-style:normal}
+footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;border-top:1px solid var(--bd)}
+#err{display:none;background:#fff4e6;color:#7a3e00;border:1px solid #ffd8a8;border-radius:6px;padding:12px 16px;margin:16px 0}
+#err code{background:#ffe8cc;padding:1px 6px;border-radius:4px}
+</style>
+</head>
+<body>
+<header class="hero"><div class="wrap">
+  <div class="top"><div>
+    <h1>Radar de noticias de Bolivia</h1>
+    <p>Busca un tema y descubre qué publican los medios bolivianos, cómo lo cubre cada uno y quién marca la agenda. Datos obtenidos por web scraping y analizados con minería de contenido, de estructura y de uso.</p>
+  </div><div class="acc"><button class="theme" id="tema">Cambiar tema</button><button class="theme" id="recargar">Actualizar datos</button><span id="estado"></span></div></div>
+</div></header>
+<div class="wrap">
+  <div class="kpis" id="kpis"></div>
+  <div id="err"></div>
+  <nav id="nav">
+    <button data-t="asistente" class="on">Asistente</button>
+    <button data-t="historias">Historias</button>
+    <button data-t="mapa">Mapa</button>
+    <button data-t="agenda">Agenda y fuentes</button>
+    <button data-t="tendencias">Tendencias</button>
+    <button data-t="bitacora">Bitácora</button>
+    <button data-t="origen">Origen y método</button>
+  </nav>
+
+  <section class="panel on" id="asistente">
+    <div class="grid2">
+      <div class="card">
+        <h2>Pregúntale a las noticias</h2>
+        <p class="sub">Escribe un tema con tus palabras. La búsqueda entiende plurales y variantes (incendio / incendios).</p>
+        <div id="filtros"></div>
+        <div id="msgs"></div>
+        <div class="ask"><input id="q" placeholder="Ej.: incendio en la Chiquitania, caso maletas, reservas de gas…" autocomplete="off"><button class="btn" id="go">Buscar</button></div>
+      </div>
+      <div>
+        <div class="card"><h3>Temas del momento</h3><p class="sub">Según Google Trends y las historias más cubiertas.</p><div id="chips"></div></div>
+        <div class="card"><h3>Historias más cubiertas</h3><div id="topH"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="historias">
+    <div class="card"><h2>Historias: el mismo hecho, varios medios</h2>
+      <p class="sub">Las noticias se conectan según su parecido (TF-IDF y coseno) y un algoritmo de comunidades (Louvain) detecta las historias. La noticia más representativa es la de mayor PageRank dentro del grafo.</p>
+      <label>Mostrar: <select id="hfiltro"><option value="1">todas las historias</option><option value="3" selected>cubiertas por 3 o más medios</option><option value="5">cubiertas por los 5 medios</option></select></label>
+    </div>
+    <div class="grid3"><div class="card"><div class="hl" id="hlist"></div></div><div id="hdet"></div></div>
+  </section>
+
+  <section class="panel" id="mapa">
+    <div class="card"><h2>Mapa de noticias</h2>
+      <p class="sub">Cada punto es una noticia; las que hablan de lo mismo quedan cerca. El tamaño indica su PageRank (importancia dentro del grafo de similitud).</p>
+      <div id="mapleg"></div>
+      <label>Resaltar historia: <select id="msel"></select></label>
+      <label class="ck"><input type="checkbox" id="mlab" checked> etiquetas de historias</label>
+      <p class="sub" style="margin:8px 0 4px">Rueda del ratón: acercar · arrastrar: mover · doble clic: restablecer · clic en un punto: ver la noticia</p>
+      <div id="mapsvg"></div>
+      <div id="mapdet"></div>
+      <div class="note" id="mapnote"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="agenda">
+    <div class="card"><h2>¿Quién marca la agenda?</h2>
+      <p class="sub">Red dirigida <b>medio seguidor → medio líder</b>: en cada historia, quien publica después apunta al que publicó antes. Se calcula PageRank y HITS: <b>authority</b> = medio al que otros siguen; <b>hub</b> = medio que sigue a muchos.</p>
+      <div class="g11"><div><label>Mostrar vínculos con al menos <select id="amin"></select> historias</label><div id="agsvg"></div></div><div id="agtab"></div></div>
+      <div class="note" id="agnote"></div>
+    </div>
+    <div class="card"><h3>Rezago entre medios</h3><p class="sub">Horas medianas que tarda el seguidor (columna) en publicar después del líder (fila), y en cuántas historias ocurrió.</p><div id="heat"></div></div>
+    <div class="card"><h3>Fuentes citadas dentro de las noticias</h3><div id="fuentes"></div></div>
+  </section>
+
+  <section class="panel" id="tendencias">
+    <div class="card"><h2>Lo que publican los medios vs. lo que busca la gente</h2>
+      <p class="sub">Interés de búsqueda en Google Trends (Bolivia, último mes) frente al porcentaje de noticias del día que mencionan el tema.</p>
+      <div id="tchips"></div><div id="tsvg"></div><div id="tinfo"></div>
+    </div>
+    <div class="card"><h3>Correlación por tema</h3><div id="ttab"></div></div>
+  </section>
+
+  <section class="panel" id="bitacora">
+    <div class="card"><h2>Bitácora automática del proyecto</h2>
+      <p class="sub">Registro de pasos, cambios en el código (con el fragmento modificado) y corridas de extracción. Se genera sola cada vez que se ejecuta el proyecto.</p>
+      <div id="ultima"></div>
+      <label>Tipo: <select id="ftipo"><option value="">todos</option><option>linea_base</option><option>cambio</option><option>corrida</option><option>paso</option></select></label>
+      <div class="tw"><table><thead><tr><th>Fecha</th><th>Tipo</th><th>Sección</th><th>Archivo</th><th>Motivo</th><th>Fragmento</th><th>Efecto</th></tr></thead><tbody id="bitbody"></tbody></table></div>
+    </div>
+  </section>
+
+  <section class="panel" id="origen">
+    <div class="card"><h2>Problema que resuelve</h2>
+      <p>Nadie lee cinco periódicos al día. Este radar reúne las noticias de varios medios bolivianos en un solo lugar, permite buscar por tema, agrupa las que cuentan el mismo hecho y muestra qué medio lo publicó primero, siempre con enlace a la fuente original.</p>
+      <div class="steps" id="pasos"></div>
+    </div>
+    <div class="card"><h2>Origen de los datos</h2><p class="sub" id="orfecha"></p><div class="tw"><table><thead><tr><th>Medio</th><th>Sitio</th><th>Pausa</th><th>Condiciones (robots.txt)</th></tr></thead><tbody id="orbody"></tbody></table></div></div>
+    <div class="card"><h2>Las tres minerías web aplicadas</h2><div class="tw"><table><thead><tr><th>Tipo</th><th>Qué se hizo</th><th>Dónde se ve</th></tr></thead><tbody>
+      <tr><td><b>Contenido</b></td><td>Web scraping con rvest, limpieza, raíces de palabras, TF-IDF, similitud del coseno, PCA, resumen extractivo</td><td>Asistente, Mapa, Historias</td></tr>
+      <tr><td><b>Estructura</b></td><td>Grafo de similitud entre noticias con PageRank y comunidades; red de agenda entre medios con PageRank y HITS; red de fuentes citadas</td><td>Historias, Agenda y fuentes</td></tr>
+      <tr><td><b>Uso</b></td><td>Google Trends Bolivia comparado con la cobertura de los medios</td><td>Tendencias</td></tr></tbody></table></div></div>
+  </section>
+  <footer><div class="wrap"><span id="gen"></span></div></footer>
+</div>
+<div id="tip" hidden></div>
+
+<script>
+/* ===== utilidades ===== */
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const urlOk=u=>/^https?:\/\//.test(u)?u:'#';
+const TZ='America/La_Paz';
+const fmtF=f=>f?new Date(f).toLocaleString('es-BO',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit',timeZone:TZ}):'';
+const fmtD=f=>f?new Date(f).toLocaleDateString('es-BO',{day:'numeric',month:'short',timeZone:TZ}):'';
+const PAL=['#9a4a1f','#1f5f9e','#2e7d4f','#5a4a8c','#9b3555','#1d7a85','#a87a12'];
+const COLORES={'El Deber':'#9a4a1f','Opinión':'#1f5f9e','Los Tiempos':'#2e7d4f','Brújula Digital':'#5a4a8c','Erbol':'#9b3555'};
+let MEDIOS=[];
+const color=m=>COLORES[m]||PAL[Math.max(0,MEDIOS.indexOf(m))%PAL.length];
+const badge=m=>`<span class="badge" style="background:${color(m)}">${esc(m)}</span>`;
+const D={};
+let activos=new Set();
+
+async function getJSON(n,fresco){
+  try{const r=await fetch('data/'+n+'.json'+(fresco?'?t='+Date.now():''));if(!r.ok) throw new Error(r.status);return await r.json();}
+  catch(e){console.warn('No se pudo cargar',n,e);return null;}
+}
+
+/* ===== tooltip ===== */
+const tip=$('#tip');
+document.addEventListener('mousemove',e=>{
+  const t=e.target.closest&&e.target.closest('[data-tip]');
+  if(!t){tip.hidden=true;return;}
+  tip.textContent=t.dataset.tip;tip.hidden=false;
+  const x=Math.min(e.clientX+14,innerWidth-tip.offsetWidth-8);
+  tip.style.left=x+'px';tip.style.top=(e.clientY+16)+'px';
+});
+
+/* ===== tema claro/oscuro ===== */
+const root=document.documentElement;
+root.dataset.theme='light';
+$('#tema').onclick=()=>{root.dataset.theme=root.dataset.theme==='dark'?'light':'dark';if(D.noticias){renderMapa();renderAgenda();renderTend();if(histSel!=null)renderHistoria(histSel);}};
+
+/* ===== pestañas ===== */
+function tab(id){
+  if(!$('#'+id)) id='asistente';
+  $$('.panel').forEach(p=>p.classList.toggle('on',p.id===id));
+  $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
+  if(location.hash!=='#'+id) history.replaceState(null,'','#'+id);
+}
+$$('#nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
+
+/* ===== búsqueda TF-IDF en el navegador ===== */
+let vocabIdx,mapaStem;
+function prepararBusqueda(){
+  vocabIdx=new Map(D.indice.vocab.map((t,i)=>[t,i]));
+  mapaStem=new Map(Object.entries(D.indice.mapa||{}));
+}
+function tokenizar(s){
+  return s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z ]/g,' ').split(/\s+/).filter(t=>t.length>=3);
+}
+function raiz(w){
+  if(mapaStem.has(w)) return mapaStem.get(w);
+  if(vocabIdx.has(w)) return w;
+  for(const suf of ['es','s']) if(w.endsWith(suf)){
+    const b=w.slice(0,-suf.length);
+    if(mapaStem.has(b)) return mapaStem.get(b);
+    if(vocabIdx.has(b)) return b;
+  }
+  if(w.length>=6){
+    const p=w.slice(0,Math.max(4,w.length-3));let best=null,bi=-1;
+    for(const t of D.indice.vocab) if(t.startsWith(p)){const v=D.indice.idf[vocabIdx.get(t)];if(v>bi){bi=v;best=t;}}
+    return best;
+  }
+  return null;
+}
+function buscar(consulta){
+  const rs=tokenizar(consulta).map(raiz).filter(r=>r&&vocabIdx.has(r));
+  if(!rs.length) return null;
+  const cnt=new Map();rs.forEach(r=>{const j=vocabIdx.get(r);cnt.set(j,(cnt.get(j)||0)+1);});
+  const q=new Map();let n2=0;
+  cnt.forEach((c,j)=>{const v=(c/rs.length)*D.indice.idf[j];q.set(j,v);n2+=v*v;});
+  const nq=Math.sqrt(n2),res=[];
+  D.indice.docs.forEach((d,id)=>{
+    if(!activos.has(D.noticias[id].m)) return;
+    let s=0;const I=[].concat(d.i),W=[].concat(d.w);
+    for(let k=0;k<I.length;k++){const v=q.get(I[k]);if(v!==undefined) s+=v*W[k];}
+    s/=nq;if(s>0) res.push({id,s});
+  });
+  return res.sort((a,b)=>b.s-a.s);
+}
+
+/* ===== Asistente ===== */
+function addMsg(rol,html){
+  const m=$('#msgs'),e=document.createElement('div');
+  e.className='msg '+rol;e.innerHTML=html;m.appendChild(e);
+  m.scrollTop=rol==='bot'?e.getBoundingClientRect().top-m.getBoundingClientRect().top+m.scrollTop-6:m.scrollHeight;
+}
+function tarjeta(r){
+  const n=D.noticias[r.id];
+  return `<a class="res" href="${esc(urlOk(n.u))}" target="_blank" rel="noopener">
+  <div class="meta">${badge(n.m)}<span>${esc(fmtF(n.f))}</span><span>similitud ${r.s.toFixed(2)}</span></div>
+  <div class="ttl">${esc(n.t)}</div><div class="ext">${esc(n.r)}</div></a>`;
+}
+function preguntar(texto){
+  texto=(texto||'').trim();if(!texto) return;
+  addMsg('user',esc(texto));
+  if(!activos.size){addMsg('bot','Activa al menos un medio para poder buscar.');return;}
+  const res=buscar(texto);
+  if(!res||!res.length){addMsg('bot','No encontré noticias sobre eso. Prueba con otras palabras o elige un tema sugerido.');return;}
+  const rel=res.filter(r=>r.s>=0.1),base=rel.length?rel:res.slice(0,5);
+  const por={};base.forEach(r=>{const m=D.noticias[r.id].m;por[m]=(por[m]||0)+1;});
+  const cob=Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([m,c])=>`<span class="badge" style="background:${color(m)}">${esc(m)}: ${c}</span>`).join(' ');
+  // historia más relacionada (suma de similitudes de las 12 mejores)
+  const sc={};res.slice(0,12).forEach(r=>{const h=D.noticias[r.id].h;if(h!=null) sc[h]=(sc[h]||0)+r.s;});
+  const hid=Object.keys(sc).sort((a,b)=>sc[b]-sc[a])[0];
+  // solo muestra la historia si la mejor noticia se parece lo suficiente a la consulta
+  const H=(hid!=null&&res[0].s>=0.15)?D.hist.find(h=>h.id==hid):null;
+  let html=`<p>Encontré <b>${base.length}</b> noticia(s) relacionada(s) con «${esc(texto)}». Cobertura por medio:</p><p>${cob}</p>`;
+  if(H) html+=`<div class="note"><b>Historia relacionada:</b> ${esc(H.titulo)}<br>${esc(H.resumen)}<br><button class="btn sec" data-h="${H.id}">Ver cobertura comparada (${H.nm} medios) →</button></div>`;
+  html+=res.slice(0,5).map(tarjeta).join('');
+  addMsg('bot',html);
+}
+function enviar(){const i=$('#q'),t=i.value;i.value='';preguntar(t);}
+function renderAsistente(){
+  $('#filtros').innerHTML='<span class="sub">Medios: </span>'+MEDIOS.map(m=>`<label class="ck"><input type="checkbox" value="${esc(m)}" checked> ${badge(m)}</label>`).join('');
+  $('#filtros').onchange=e=>{if(e.target.value){e.target.checked?activos.add(e.target.value):activos.delete(e.target.value);}};
+  const temas=[...(D.meta.temas||[])];
+  $('#chips').innerHTML=temas.map(t=>`<button class="chip" data-q="${esc(t)}">${esc(t)}</button>`).join('')||'<span class="sub">Sin temas aún.</span>';
+  $('#topH').innerHTML=D.hist.slice(0,5).map(h=>`<div class="hi" data-h="${h.id}"><div class="t">${esc(h.titulo)}</div><div class="meta"><span>${h.nm} medios · ${h.n} notas</span></div></div>`).join('');
+  if(!$('#msgs').children.length) addMsg('bot','Busco en las noticias de '+MEDIOS.length+' medios bolivianos. Escribe un tema o elige uno de los sugeridos.');
+}
+
+/* ===== Historias ===== */
+let histSel=null;
+function renderListaHistorias(){
+  const min=+$('#hfiltro').value;
+  const lista=D.hist.filter(h=>h.nm>=min);
+  $('#hlist').innerHTML=lista.map(h=>`<div class="hi ${h.id===histSel?'on':''}" data-h="${h.id}"><div class="t">${esc(h.titulo)}</div><div class="meta"><span>${h.nm} medios · ${h.n} notas</span><span>${esc(fmtD(h.fi))}${h.fi.slice(0,10)!==h.ff.slice(0,10)?' – '+esc(fmtD(h.ff)):''}</span></div></div>`).join('')||'<p class="sub">No hay historias con ese filtro.</p>';
+  if(histSel==null&&lista.length) renderHistoria(lista[0].id);
+}
+function lineaTiempo(notas){
+  const W=760,rowH=34,top=14,left=120,right=20,H=top+rowH*MEDIOS_H.length+34;
+  const ts=notas.map(n=>+new Date(n.f));let t0=Math.min(...ts),t1=Math.max(...ts);if(t1-t0<36e5){t0-=18e5;t1+=18e5;}
+  const pad=(t1-t0)*.03;t0-=pad;t1+=pad;
+  const X=t=>left+(t-t0)/(t1-t0)*(W-left-right);
+  let s='';
+  MEDIOS_H.forEach((m,i)=>{
+    const y=top+rowH*i+rowH/2;
+    s+=`<line x1="${left}" x2="${W-right}" y1="${y}" y2="${y}" stroke="var(--bd)"/><text x="${left-10}" y="${y+4}" text-anchor="end" font-size="12">${esc(m)}</text>`;
+  });
+  const dias=(t1-t0)/864e5,nt=5;
+  for(let k=0;k<=nt;k++){
+    const t=t0+(t1-t0)*k/nt,x=X(t),d=new Date(t);
+    const lab=dias<2?d.toLocaleTimeString('es-BO',{hour:'2-digit',minute:'2-digit',timeZone:TZ}):d.toLocaleDateString('es-BO',{day:'numeric',month:'short',timeZone:TZ});
+    s+=`<line x1="${x}" x2="${x}" y1="${top}" y2="${top+rowH*MEDIOS_H.length}" stroke="var(--bd)" stroke-dasharray="3 4"/><text class="mut" x="${x}" y="${H-10}" text-anchor="middle" font-size="11">${esc(lab)}</text>`;
+  }
+  notas.forEach(n=>{
+    const i=MEDIOS_H.indexOf(n.m);if(i<0) return;
+    const y=top+rowH*i+rowH/2;
+    s+=`<a href="${esc(urlOk(n.u))}" target="_blank" rel="noopener"><circle cx="${X(+new Date(n.f))}" cy="${y}" r="7" fill="${color(n.m)}" fill-opacity=".85" stroke="var(--panel)" stroke-width="2" data-tip="${esc(n.m+' · '+fmtF(n.f)+'\n'+n.t)}"/></a>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Línea de tiempo de la cobertura">${s}</svg>`;
+}
+let MEDIOS_H=[];
+function renderHistoria(id){
+  histSel=id;
+  const h=D.hist.find(x=>x.id===id);if(!h) return;
+  const notas=h.notas.map(i=>D.noticias[i]).sort((a,b)=>a.f<b.f?-1:1);
+  MEDIOS_H=[...new Set(notas.map(n=>n.m))].sort();
+  const cols=MEDIOS_H.map(m=>{
+    const ns=notas.filter(n=>n.m===m);
+    return `<div class="col">${badge(m)} <small>${ns.length} nota(s)</small>${ns.map(n=>`<a href="${esc(urlOk(n.u))}" target="_blank" rel="noopener"><small>${esc(fmtF(n.f))}</small><br>${esc(n.t)}</a>`).join('')}</div>`;
+  }).join('');
+  $('#hdet').innerHTML=`<div class="card"><h2>${esc(h.titulo)}</h2>
+    <div class="meta">${h.medios.map(badge).join(' ')}<span>${h.n} notas</span><span>${esc(fmtD(h.fi))} – ${esc(fmtD(h.ff))}</span></div>
+    <p>${esc(h.resumen)}</p><p>${h.palabras.map(p=>`<span class="tag">${esc(p)}</span>`).join(' ')}</p>
+    <button class="btn sec" data-mapa="${h.id}">Ver en el mapa</button></div>
+    <div class="card"><h3>Línea de tiempo de la cobertura</h3>${lineaTiempo(notas)}</div>
+    <div class="card"><h3>Cobertura comparada: cómo lo titula cada medio</h3><div class="cols">${cols}</div></div>`;
+  $$('#hlist .hi').forEach(e=>e.classList.toggle('on',+e.dataset.h===id));
+}
+
+/* ===== Mapa ===== */
+let mapSel='', mapOff=new Set();
+const MW=920,MH=540;let vista={x:0,y:0,w:MW,h:MH},arrastre=null,movido=false;
+function aplicarVista(){
+  const svg=$('#mapsvg svg');if(!svg) return;
+  const z=vista.w/MW;
+  svg.setAttribute('viewBox',`${vista.x} ${vista.y} ${vista.w} ${vista.h}`);
+  svg.querySelectorAll('.pt').forEach(c=>c.setAttribute('r',(c.dataset.r*Math.pow(z,.6)).toFixed(1)));
+  svg.querySelectorAll('.lbl').forEach(t=>{t.setAttribute('font-size',(12*z).toFixed(1));t.style.strokeWidth=(4*z).toFixed(1)+'px';});
+}
+function renderMapa(){
+  const N=D.noticias,W=920,H=540,P=34;
+  const xs=N.map(n=>n.x),ys=N.map(n=>n.y);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const X=v=>P+(v-x0)/(x1-x0)*(W-2*P),Y=v=>H-P-(v-y0)/(y1-y0)*(H-2*P);
+  const pmax=Math.max(...N.map(n=>n.p));
+  const enH=mapSel===''?null:new Set((D.hist.find(h=>h.id==mapSel)||{notas:[]}).notas);
+  let s=`<rect x="0" y="0" width="${W}" height="${H}" rx="14" fill="var(--soft)" fill-opacity=".5"/>`;
+  [...N].sort((a,b)=>a.p-b.p).forEach(n=>{
+    if(mapOff.has(n.m)) return;
+    const dim=enH&&!enH.has(n.id),r=2.5+7*Math.sqrt(n.p/pmax);
+    s+=`<circle class="pt" data-r="${r.toFixed(1)}" data-id="${n.id}" cx="${X(n.x).toFixed(1)}" cy="${Y(n.y).toFixed(1)}" r="${r.toFixed(1)}" fill="${color(n.m)}" fill-opacity="${dim?.1:.72}" stroke="var(--panel)" stroke-width="${dim?0:1.2}" style="cursor:pointer" data-tip="${esc(n.m+' · '+fmtF(n.f)+'\n'+n.t)}"/>`;
+  });
+  if($('#mlab').checked){
+    const puestas=[];
+    D.hist.filter(h=>h.nm>=3).slice().sort((a,b)=>b.n-a.n).forEach(h=>{
+      const ns=h.notas.map(i=>N[i]).filter(n=>!mapOff.has(n.m));if(!ns.length) return;
+      if(enH&&!(+mapSel===h.id)) return;
+      const px=X(ns.reduce((a,n)=>a+n.x,0)/ns.length),py=Y(ns.reduce((a,n)=>a+n.y,0)/ns.length);
+      if(!enH&&puestas.some(q=>Math.abs(q.x-px)<125&&Math.abs(q.y-py)<17)) return;
+      puestas.push({x:px,y:py});
+      const txt=h.palabras.slice(0,2).join(' · ');
+      s+=`<text class="lbl" x="${px.toFixed(1)}" y="${py.toFixed(1)}" text-anchor="middle" font-size="12" font-weight="700" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px;pointer-events:none">${esc(txt)}</text>`;
+    });
+  }
+  $('#mapsvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Mapa de noticias en 2D" style="cursor:grab;touch-action:none">${s}</svg>`;
+  aplicarVista();
+  $('#mapleg').innerHTML=MEDIOS.map(m=>`<button class="chip ${mapOff.has(m)?'':'on'}" data-mm="${esc(m)}" style="${mapOff.has(m)?'':'background:'+color(m)+';border-color:'+color(m)}">${esc(m)}</button>`).join('');
+  $('#msel').innerHTML='<option value="">— ninguna —</option>'+D.hist.filter(h=>h.nm>=2).map(h=>`<option value="${h.id}" ${String(h.id)===String(mapSel)?'selected':''}>${esc(h.titulo.slice(0,70))} (${h.nm} medios)</option>`).join('');
+  $('#mapnote').innerHTML=`Los dos ejes (PCA sobre el TF-IDF) explican solo el <b>${esc(D.meta.gof)}%</b> de la variabilidad: es normal en texto, que tiene miles de dimensiones. Úsalo para ver vecindades y grupos, no distancias exactas.`;
+}
+
+/* ===== Agenda y fuentes ===== */
+function renderAgenda(){
+  const A=D.agenda;
+  if(!A||!A.ok){$('#agsvg').innerHTML='<p class="sub">Aún no hay suficientes historias con 2 o más medios.</p>';return;}
+  const sel=$('#amin');
+  if(!sel.options.length){const mx=Math.max(...A.aristas.map(a=>a.n));for(let k=1;k<=mx;k++){const o=document.createElement('option');o.value=k;o.textContent=k;if(k===Math.min(5,mx)) o.selected=true;sel.appendChild(o);}sel.onchange=renderAgenda;}
+  const min=+sel.value,W=520,H=440,cx=W/2,cy=H/2+4,R=160;
+  const nodos=A.nodos.slice().sort((a,b)=>a.id<b.id?-1:1);
+  const pos={};nodos.forEach((n,i)=>{const ang=-Math.PI/2+2*Math.PI*i/nodos.length;pos[n.id]={x:cx+R*Math.cos(ang),y:cy+R*Math.sin(ang),n};});
+  const rad=n=>16+22*n.auth;
+  let defs='',s='';
+  A.aristas.filter(a=>a.n>=min).forEach(a=>{
+    const p=pos[a.from],q=pos[a.to];if(!p||!q) return;
+    const dx=q.x-p.x,dy=q.y-p.y,d=Math.hypot(dx,dy),ux=dx/d,uy=dy/d;
+    const sx=p.x+ux*rad(p.n)+(-uy*5),sy=p.y+uy*rad(p.n)+(ux*5),ex=q.x-ux*(rad(q.n)+4)+(-uy*5),ey=q.y-uy*(rad(q.n)+4)+(ux*5);
+    const mx=(sx+ex)/2-uy*26,my=(sy+ey)/2+ux*26,w=1+a.n*.55,c=color(a.to);
+    const id='ar'+a.from.length+a.to.length+Math.round(sx);
+    defs+=`<marker id="${id}" viewBox="0 0 12 12" refX="10" refY="6" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto"><path d="M0 0 L12 6 L0 12 z" fill="${c}"/></marker>`;
+    s+=`<path d="M${sx.toFixed(1)} ${sy.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}" fill="none" stroke="${c}" stroke-opacity=".6" stroke-width="${w.toFixed(1)}" marker-end="url(#${id})" data-tip="${esc(a.from+' siguió a '+a.to+' en '+a.n+' historias\nrezago mediano: '+a.rezago+' h')}"/>`;
+  });
+  nodos.forEach(n=>{
+    const p=pos[n.id];
+    s+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${rad(n).toFixed(1)}" fill="${color(n.id)}" fill-opacity=".9" stroke="var(--panel)" stroke-width="3" data-tip="${esc(n.id+'\nauthority '+n.auth+' · hub '+n.hub+'\nprimicias: '+n.primicias+' de '+n.historias)}"/>
+    <text x="${p.x.toFixed(1)}" y="${(p.y+rad(n)+16).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px">${esc(n.id)}</text>
+    <text class="mut" x="${p.x.toFixed(1)}" y="${(p.y+rad(n)+31).toFixed(1)}" text-anchor="middle" font-size="11">authority ${n.auth.toFixed(2)}</text>`;
+  });
+  $('#agsvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Red de agenda entre medios"><defs>${defs}</defs>${s}</svg>`;
+  const ord=A.nodos.slice().sort((a,b)=>b.auth-a.auth);
+  const bar=v=>`<div class="bar" style="margin:0"><span class="tr" style="flex:1;min-width:34px"><i style="width:${(v*100).toFixed(0)}%;background:var(--ac)"></i></span><span class="v">${v.toFixed(2)}</span></div>`;
+  $('#agtab').innerHTML=`<div class="tw"><table><thead><tr><th>Medio</th><th>Historias</th><th>Primicias</th><th>Authority</th><th>Hub</th></tr></thead><tbody>${ord.map(n=>`<tr><td>${badge(n.id)}</td><td>${n.historias}</td><td>${n.primicias} <small>(${n.pct_primicias==null?'–':n.pct_primicias+'%'})</small></td><td>${bar(n.auth)}</td><td>${bar(n.hub)}</td></tr>`).join('')}</tbody></table></div>`;
+  const lid=ord[0],prim=A.nodos.slice().sort((a,b)=>b.primicias-a.primicias)[0],hub=A.nodos.slice().sort((a,b)=>b.hub-a.hub)[0];
+  $('#agnote').innerHTML=`<b>Lectura:</b> el medio más seguido por los demás (mayor authority) es <b>${esc(lid.id)}</b>; el que más primicias logra es <b>${esc(prim.id)}</b> (${prim.primicias}); el más reactivo (mayor hub) es <b>${esc(hub.id)}</b>. Se analizaron ${A.n_historias} historias con 2 o más medios. <br><b>Límite:</b> “primero” significa primero entre lo que se recolectó de las portadas; con pocos días de datos, las diferencias entre medios son indicativas, no definitivas.`;
+  $('#agnote').className='note warn';
+  // mapa de calor de rezago
+  const ms=A.nodos.map(n=>n.id).sort(),mx=Math.max(...A.aristas.map(a=>a.n));
+  let h=`<div class="heat" style="grid-template-columns:110px repeat(${ms.length},1fr)"><div class="h">líder ↓ / seguidor →</div>${ms.map(m=>`<div class="h">${esc(m)}</div>`).join('')}`;
+  ms.forEach(l=>{h+=`<div class="h" style="text-align:left">${esc(l)}</div>`;ms.forEach(f=>{
+    const a=A.aristas.find(x=>x.to===l&&x.from===f);
+    if(l===f||!a){h+=`<div style="background:var(--soft);opacity:.4">–</div>`;return;}
+    const al=.15+.7*a.n/mx;
+    h+=`<div style="background:${color(l)}${Math.round(al*255).toString(16).padStart(2,'0')}" data-tip="${esc(f+' tarda '+a.rezago+' h (mediana) tras '+l+'\nen '+a.n+' historias')}"><b>${a.rezago} h</b><br><small>${a.n} hist.</small></div>`;});});
+  $('#heat').innerHTML=h+'</div>';
+  // fuentes citadas
+  const RF=D.red;
+  if(!RF||!RF.ok){$('#fuentes').innerHTML='<p class="sub">Aún no hay suficientes citas externas.</p>';return;}
+  const cc={'Redes sociales':'#1f5f9e','Gobierno':'#2e7d4f','Prensa y otros':'#5a4a8c','Medio boliviano':'#9a4a1f'};
+  const fs=RF.nodos.filter(n=>n.tipo==='fuente').sort((a,b)=>b.n-a.n).slice(0,12),mf=Math.max(...fs.map(f=>f.n));
+  $('#fuentes').innerHTML=`<p class="sub">Solo el <b>${RF.pct_con_citas}%</b> de las noticias enlaza a una fuente externa dentro del texto, por eso esta red es pequeña (${RF.total_fuentes} fuentes distintas). Los medios bolivianos casi no enlazan fuera.</p>`+
+    fs.map(f=>`<div class="bar"><span class="l">${esc(f.id)}</span><span class="tr"><i style="width:${(f.n/mf*100).toFixed(0)}%;background:${cc[f.cat]||'#667085'}"></i></span><span class="v">${f.n}</span></div>`).join('')+
+    `<p class="sub">${Object.entries(cc).map(([k,c])=>`<span class="badge" style="background:${c}">${esc(k)}</span>`).join(' ')}</p>`;
+}
+
+/* ===== Tendencias ===== */
+let temaSel=null;
+const MIN_NOTAS=15;
+function renderTend(){
+  const T=D.tend;
+  if(!T||!T.ok||!T.trends.length){$('#tsvg').innerHTML='<p class="sub">Google Trends no está disponible en esta actualización.</p>';$('#tchips').innerHTML='';$('#tinfo').innerHTML='';$('#ttab').innerHTML='';return;}
+  if(!temaSel) temaSel=T.temas[0];
+  $('#tchips').innerHTML=T.temas.map(t=>`<button class="chip ${t===temaSel?'on':''}" data-tt="${esc(t)}">${esc(t)}</button>`).join('');
+  const tr=T.trends.filter(r=>r.tema===temaSel),cv=T.cobertura.filter(r=>r.tema===temaSel);
+  const d0=Date.parse(tr[0].fecha+'T12:00:00'),dn=Date.parse(tr[tr.length-1].fecha+'T12:00:00');
+  const W=900,H=360,L=44,Rr=16,Tp=16,plotH=230,band=50;
+  const X=f=>L+(Date.parse(f+'T12:00:00')-d0)/(dn-d0)*(W-L-Rr),Y=v=>Tp+plotH-(v/100)*plotH;
+  let s='';
+  [0,25,50,75,100].forEach(v=>{s+=`<line x1="${L}" x2="${W-Rr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--bd)"/><text class="mut" x="${L-8}" y="${Y(v)+4}" text-anchor="end" font-size="11">${v}</text>`;});
+  tr.forEach((r,i)=>{if(i%5===0) s+=`<text class="mut" x="${X(r.fecha)}" y="${Tp+plotH+16}" text-anchor="middle" font-size="11">${esc(fmtD(r.fecha+'T12:00:00'))}</text>`;});
+  s+=`<polyline fill="none" stroke="#3b6fc4" stroke-width="2.5" points="${tr.map(r=>X(r.fecha).toFixed(1)+','+Y(r.interes).toFixed(1)).join(' ')}"/>`;
+  tr.forEach(r=>{s+=`<circle cx="${X(r.fecha)}" cy="${Y(r.interes)}" r="3" fill="#3b6fc4" data-tip="${esc('Google Trends · '+fmtD(r.fecha+'T12:00:00')+'\ninterés: '+r.interes)}"/>`;});
+  const val=cv.filter(r=>r.n_total>=MIN_NOTAS&&r.pct!=null&&Date.parse(r.fecha+'T12:00:00')>=d0),mxp=Math.max(1,...val.map(r=>r.pct));
+  const yc=r=>Y(r.pct/mxp*100);
+  if(val.length>1) s+=`<polyline fill="none" stroke="#b8731a" stroke-width="2.5" points="${val.map(r=>X(r.fecha).toFixed(1)+','+yc(r).toFixed(1)).join(' ')}"/>`;
+  val.forEach(r=>{s+=`<circle cx="${X(r.fecha)}" cy="${yc(r)}" r="5" fill="#9a4a1f" stroke="var(--panel)" stroke-width="2" data-tip="${esc('Cobertura · '+fmtD(r.fecha+'T12:00:00')+'\n'+r.pct+'% de '+r.n_total+' noticias ('+r.n+' mencionan «'+temaSel+'»)')}"/>`;});
+  const tot=[...new Map(T.cobertura.map(r=>[r.fecha,r.n_total])).entries()].filter(([f])=>Date.parse(f+'T12:00:00')>=d0),mt=Math.max(1,...tot.map(x=>x[1]));
+  const by=Tp+plotH+24;
+  s+=`<text class="mut" x="${L}" y="${by+10}" font-size="11">Noticias recolectadas por día (barra gris; la cobertura se compara solo en días con ${MIN_NOTAS} o más)</text>`;
+  tot.forEach(([f,n])=>{const h=n/mt*band;s+=`<rect x="${X(f)-4}" y="${by+16+band-h}" width="8" height="${h}" rx="2" fill="${n>=MIN_NOTAS?'#98a2b3':'#d0d5dd'}" data-tip="${esc(fmtD(f+'T12:00:00')+': '+n+' noticias recolectadas')}"/>`;});
+  $('#tsvg').innerHTML=`<svg viewBox="0 0 ${W} ${H+30}" role="img" aria-label="Google Trends frente a cobertura de los medios">${s}</svg>`;
+  $('#tinfo').innerHTML=`<p><span class="badge" style="background:#3b6fc4">Interés en Google (0–100)</span> <span class="badge" style="background:#b8731a">Cobertura de los medios (% de noticias del día, escalada al máximo = 100)</span></p><div class="note warn">Fuente de Trends: ${esc(T.fuente)} (${esc(T.generado)}). Los datos de cobertura son recientes y se concentran en pocos días, así que la comparación mejora cada día que se actualiza el proyecto. Google Trends mide búsquedas de una palabra suelta; palabras con varios sentidos (como “papa”) mezclan significados.</div>`;
+  const interp=r=>{if(r==null) return 'sin datos suficientes';const a=Math.abs(r);return (a>=.6?'fuerte ':a>=.3?'moderada ':'débil o nula ')+(a<.3?'':r>0?'positiva (suben juntos)':'negativa (van en sentido contrario)');};
+  $('#ttab').innerHTML=`<div class="tw"><table><thead><tr><th>Tema</th><th>Días comparados</th><th>Correlación</th><th>Lectura</th></tr></thead><tbody>${T.correlaciones.map(c=>`<tr><td><b>${esc(c.tema)}</b></td><td>${c.dias||0}</td><td>${c.correlacion==null?'–':c.correlacion}</td><td>${interp(c.correlacion)}${c.dias&&c.dias<10&&c.correlacion!=null?' <small>(con tan pocos días es solo indicativa)</small>':''}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ===== Bitácora y origen ===== */
+function renderBit(){
+  const B=D.bit;
+  if(!B||!B.length){$('#bitbody').innerHTML='<tr><td colspan="7">No se encontró bitacora.json</td></tr>';return;}
+  const u=B.find(b=>b.tipo==='corrida');
+  $('#ultima').innerHTML=u?`<div class="note"><b>Última corrida:</b> ${esc(u.fecha)} ${esc(u.hora)} · ${esc(u.seccion)}<br>${esc(u.efecto)}</div>`:'';
+  const t=$('#ftipo').value;
+  $('#bitbody').innerHTML=B.filter(b=>!t||b.tipo===t).map(b=>`<tr><td>${esc(b.fecha)}<br><small>${esc(b.hora)}</small></td><td><span class="tag">${esc(b.tipo)}</span></td><td>${esc(b.seccion)}</td><td>${esc(b.archivo)}<br><small>${esc(b.version)}</small></td><td>${esc(b.motivo)}</td><td>${b.fragmento?`<details><summary>ver</summary><pre>${esc(b.fragmento)}</pre></details>`:''}</td><td>${esc(b.efecto)}</td></tr>`).join('');
+}
+function renderOrigen(){
+  $('#orbody').innerHTML=D.meta.medios.map(m=>`<tr><td>${badge(m.medio)}</td><td><a href="${esc(urlOk(m.url))}" target="_blank" rel="noopener">${esc(m.url)}</a></td><td>${esc(m.pausa)} s</td><td>${esc(m.condiciones)}</td></tr>`).join('');
+  $('#pasos').innerHTML=['Scraping (rvest)','Limpieza y raíces','TF-IDF','Grafos: similitud, agenda','Google Trends','JSON','Este dashboard'].map(t=>`<span>${t}</span>`).join('<i>→</i>');
+  $('#gen').textContent='Actualizado: '+D.meta.generado;
+  $('#orfecha').textContent='Datos actualizados: '+D.meta.generado;
+}
+
+/* ===== eventos globales ===== */
+document.addEventListener('click',e=>{
+  const c=e.target.closest('[data-q]');if(c){tab('asistente');preguntar(c.dataset.q);return;}
+  const h=e.target.closest('[data-h]');if(h){const id=+h.dataset.h;tab('historias');histSel=id;renderListaHistorias();renderHistoria(id);return;}
+  const mp=e.target.closest('[data-mapa]');if(mp){mapSel=mp.dataset.mapa;tab('mapa');$('#msel').value=mapSel;renderMapa();return;}
+  const mm=e.target.closest('[data-mm]');if(mm){const m=mm.dataset.mm;mapOff.has(m)?mapOff.delete(m):mapOff.add(m);renderMapa();return;}
+  const tt=e.target.closest('[data-tt]');if(tt){temaSel=tt.dataset.tt;renderTend();return;}
+  const pt=e.target.closest('.pt');if(pt&&!movido){
+    const n=D.noticias[+pt.dataset.id];
+    $('#mapdet').innerHTML=`<a class="res" href="${esc(urlOk(n.u))}" target="_blank" rel="noopener"><div class="meta">${badge(n.m)}<span>${esc(fmtF(n.f))}</span>${n.h!=null?'<span>historia #'+n.h+'</span>':''}</div><div class="ttl">${esc(n.t)}</div><div class="ext">${esc(n.r)}</div></a>`;
+  }
+});
+$('#mapsvg').addEventListener('wheel',e=>{
+  e.preventDefault();
+  const r=$('#mapsvg svg').getBoundingClientRect(),fx=(e.clientX-r.left)/r.width,fy=(e.clientY-r.top)/r.height;
+  const k=e.deltaY<0?.8:1.25,w=Math.min(MW,Math.max(MW/14,vista.w*k)),h=w*MH/MW;
+  vista.x=Math.min(MW-w,Math.max(0,vista.x+fx*(vista.w-w)));vista.y=Math.min(MH-h,Math.max(0,vista.y+fy*(vista.h-h)));vista.w=w;vista.h=h;aplicarVista();
+},{passive:false});
+$('#mapsvg').addEventListener('mousedown',e=>{arrastre={sx:e.clientX,sy:e.clientY,x:vista.x,y:vista.y};movido=false;});
+window.addEventListener('mousemove',e=>{
+  if(!arrastre) return;
+  const r=$('#mapsvg svg').getBoundingClientRect(),dx=e.clientX-arrastre.sx,dy=e.clientY-arrastre.sy;
+  if(Math.abs(dx)+Math.abs(dy)>4) movido=true;
+  vista.x=Math.min(MW-vista.w,Math.max(0,arrastre.x-dx/r.width*vista.w));vista.y=Math.min(MH-vista.h,Math.max(0,arrastre.y-dy/r.height*vista.h));aplicarVista();
+});
+window.addEventListener('mouseup',()=>{arrastre=null;});
+$('#mapsvg').addEventListener('dblclick',()=>{vista={x:0,y:0,w:MW,h:MH};aplicarVista();});
+$('#go').onclick=enviar;
+$('#q').addEventListener('keydown',e=>{if(e.key==='Enter') enviar();});
+$('#hfiltro').onchange=()=>{histSel=null;renderListaHistorias();};
+$('#msel').onchange=e=>{mapSel=e.target.value;renderMapa();};
+$('#mlab').onchange=renderMapa;
+$('#ftipo').onchange=renderBit;
+window.addEventListener('hashchange',()=>tab(location.hash.slice(1)));
+
+/* ===== arranque y recarga de datos ===== */
+async function cargar(recarga){
+  const [noticias,hist,meta,agenda,red,tend,bit,indice]=await Promise.all(
+    ['noticias','historias','meta','agenda','red_fuentes','tendencias','bitacora','indice'].map(n=>getJSON(n,recarga)));
+  if(!noticias||!hist||!meta||!indice){
+    if(recarga){$('#estado').textContent='No se pudieron recargar los datos.';return false;}
+    $('#err').style.display='block';
+    $('#err').innerHTML='No se pudieron cargar los datos. Si abriste el archivo con doble clic, ábrelo con un servidor local: en R ejecuta <code>servr::httd("docs")</code>. Si ya está publicado, revisa que exista la carpeta <code>docs/data</code>.';
+    return false;
+  }
+  Object.assign(D,{noticias,hist,meta,agenda,red,tend,bit,indice});
+  MEDIOS=meta.por_medio.map(m=>m.medio).sort();activos=new Set(MEDIOS);histSel=null;
+  prepararBusqueda();
+  const f=noticias.map(n=>n.f).sort();
+  const multi=hist.filter(h=>h.nm>=3).length;
+  $('#kpis').innerHTML=[[meta.n_docs,'noticias analizadas'],[MEDIOS.length,'medios'],[meta.n_historias,'historias detectadas'],[multi,'cubiertas por 3+ medios'],[fmtD(f[f.length-1]),'última noticia']]
+    .map(k=>`<div class="kpi"><b>${esc(k[0])}</b><span>${esc(k[1])}</span></div>`).join('');
+  renderAsistente();renderListaHistorias();renderMapa();renderAgenda();renderTend();renderBit();renderOrigen();
+  tab(location.hash.slice(1)||'asistente');
+  return true;
+}
+$('#recargar').onclick=async()=>{
+  const b=$('#recargar'),antes=D.meta?D.meta.generado:null;
+  b.disabled=true;b.textContent='Actualizando...';$('#estado').textContent='';
+  const ok=await cargar(true);
+  b.disabled=false;b.textContent='Actualizar datos';
+  if(ok) $('#estado').textContent=(D.meta.generado===antes?'Ya tienes los datos más recientes publicados. ':'Datos recargados. ')+'Última actualización: '+D.meta.generado;
+};
+cargar(false);
+</script>
+</body>
+</html>

@@ -150,7 +150,7 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
       <p>Se construye un grafo: cada <b>nodo</b> es una noticia, y dos noticias se conectan si su similitud (TF-IDF y coseno) es al menos <b id="gum">0.30</b> y se publicaron con menos de <b id="gvd">7</b> días de diferencia. Sobre ese grafo se aplican dos algoritmos:</p>
       <ul><li><b>PageRank</b>, el algoritmo de Google, elige la noticia más representativa de cada grupo (es el tamaño del nodo).</li>
       <li><b>Louvain</b> detecta comunidades: cada comunidad es una <b>historia</b>, el mismo hecho cubierto por varios medios.</li></ul>
-      <label>Colorear por: <select id="gcol"><option value="medio">medio</option><option value="historia">historia (las 12 mayores)</option></select></label>
+      <label>Colorear por: <select id="gcol"><option value="medio">medio</option><option value="historia">historia (mayor cobertura)</option></select></label>
       <label>Resaltar historia: <select id="gsel"></select></label>
       <div id="grsvg"></div><div id="grleg"></div><div id="grdet"></div><div class="note" id="grnote"></div>
     </div>
@@ -446,6 +446,15 @@ function initGrafo(){
   $('#gum').textContent=UM().toFixed(2);$('#gvd').textContent=VD();
   $('#gsel').innerHTML='<option value="">— ninguna —</option>'+D.hist.filter(h=>h.nm>=2).map(h=>`<option value="${h.id}">${esc(h.titulo.slice(0,70))} (${h.nm} medios)</option>`).join('');
 }
+function seleccionarEnGrafo(id){
+  const s=$('#gsel');if(!s) return;
+  if(![...s.options].some(o=>o.value==id)){const hh=D.hist.find(x=>x.id==id);if(hh){const o=document.createElement('option');o.value=id;o.textContent=hh.titulo.slice(0,70)+' ('+hh.nm+' medios)';s.appendChild(o);}}
+  s.value=id;
+}
+function irArriba(id){   // deja el inicio de la hoja justo debajo del menú fijo
+  const y=$('#'+id).getBoundingClientRect().top+window.scrollY-$('#nav').offsetHeight;
+  window.scrollTo({top:Math.max(0,y)});
+}
 function renderGrafoGlobal(){
   if(!D.noticias) return;
   const N=D.noticias,W=920,H=520;
@@ -463,7 +472,8 @@ function renderGrafoGlobal(){
   }
   const modo=$('#gcol').value,sel=$('#gsel').value;
   const enH=sel===''?null:new Set((D.hist.find(h=>h.id==sel)||{notas:[]}).notas);
-  const top=D.hist.filter(h=>h.nm>=3).slice(0,12),cH=new Map(top.map((h,k)=>[h.id,PAL12[k]]));
+  const top=D.hist.filter(h=>h.nm>=3).slice().sort((a,b)=>b.nm-a.nm||b.n-a.n).slice(0,12),cH=new Map(top.map((h,k)=>[h.id,PAL12[k]]));
+  if(sel!==''&&!cH.has(+sel)) cH.set(+sel,'#1f77b4');   // la historia elegida siempre tiene color propio
   const pmax=Math.max(...N.map(n=>n.p));
   let s=`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="var(--soft)" fill-opacity=".5"/>`;
   GR.ed.forEach(([a,b,w])=>{
@@ -648,7 +658,7 @@ function renderOrigen(){
 /* ===== eventos globales ===== */
 document.addEventListener('click',e=>{
   const c=e.target.closest('[data-q]');if(c){tab('asistente');preguntar(c.dataset.q);return;}
-  const h=e.target.closest('[data-h]');if(h){const id=+h.dataset.h;tab('historias');histSel=id;renderListaHistorias();renderHistoria(id);return;}
+  const h=e.target.closest('[data-h]');if(h){const id=+h.dataset.h,venia=!$('#historias').classList.contains('on');seleccionarEnGrafo(id);tab('historias');histSel=id;renderListaHistorias();renderHistoria(id);if(venia) irArriba('historias');return;}
   const mp=e.target.closest('[data-mapa]');if(mp){mapSel=mp.dataset.mapa;tab('mapa');$('#msel').value=mapSel;renderMapa();return;}
   const mm=e.target.closest('[data-mm]');if(mm){const m=mm.dataset.mm;mapOff.has(m)?mapOff.delete(m):mapOff.add(m);renderMapa();return;}
   const tt=e.target.closest('[data-tt]');if(tt){temaSel=tt.dataset.tt;renderTend();return;}

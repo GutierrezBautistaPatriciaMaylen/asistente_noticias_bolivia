@@ -127,6 +127,7 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
     <div class="grid2">
       <div class="card">
         <h2>Pregúntale a las noticias</h2>
+        <p class="sub">Escribe un tema con tus palabras. La búsqueda entiende plurales y variantes (incendio / incendios).</p>
         <div id="filtros"></div>
         <div id="msgs"></div>
         <div class="ask"><input id="q" placeholder="Ej.: incendio en la Chiquitania, caso maletas, reservas de gas…" autocomplete="off"><button class="btn" id="go">Buscar</button></div>
@@ -142,6 +143,14 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
     <div class="card"><h2>Historias: el mismo hecho, varios medios</h2>
       <p class="sub">Las noticias se conectan según su parecido (TF-IDF y coseno) y un algoritmo de comunidades (Louvain) detecta las historias. La noticia más representativa es la de mayor PageRank dentro del grafo.</p>
       <label>Mostrar: <select id="hfiltro"><option value="1">todas las historias</option><option value="3" selected>cubiertas por 3 o más medios</option><option value="5">cubiertas por los 5 medios</option></select></label>
+    </div>
+    <div class="card"><h2>Cómo se detectan las historias: el grafo de similitud</h2>
+      <p>Se construye un grafo: cada <b>nodo</b> es una noticia, y dos noticias se conectan si su similitud (TF-IDF y coseno) es al menos <b id="gum">0.30</b> y se publicaron con menos de <b id="gvd">7</b> días de diferencia. Sobre ese grafo se aplican dos algoritmos:</p>
+      <ul><li><b>PageRank</b>, el algoritmo de Google, elige la noticia más representativa de cada grupo (es el tamaño del nodo).</li>
+      <li><b>Louvain</b> detecta comunidades: cada comunidad es una <b>historia</b>, el mismo hecho cubierto por varios medios.</li></ul>
+      <label>Colorear por: <select id="gcol"><option value="medio">medio</option><option value="historia">historia (las 12 mayores)</option></select></label>
+      <label>Resaltar historia: <select id="gsel"></select></label>
+      <div id="grsvg"></div><div id="grleg"></div><div id="grdet"></div><div class="note" id="grnote"></div>
     </div>
     <div class="grid3"><div class="card"><div class="hl" id="hlist"></div></div><div id="hdet"></div></div>
   </section>
@@ -191,6 +200,10 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
       <tr><td><b>Contenido</b></td><td>Web scraping con rvest, limpieza, raíces de palabras, TF-IDF, similitud del coseno, PCA, resumen extractivo</td><td>Asistente, Mapa, Historias</td></tr>
       <tr><td><b>Estructura</b></td><td>Grafo de similitud entre noticias con PageRank y comunidades; red de agenda entre medios con PageRank y HITS; red de fuentes citadas</td><td>Historias, Agenda y fuentes</td></tr>
       <tr><td><b>Uso</b></td><td>Google Trends Bolivia comparado con la cobertura de los medios</td><td>Tendencias</td></tr></tbody></table></div></div>
+    <div class="card"><h2>Problema que resuelve</h2>
+      <p>Nadie lee cinco periódicos al día. Este radar reúne las noticias de varios medios bolivianos en un solo lugar, permite buscar por tema, agrupa las que cuentan el mismo hecho y muestra qué medio lo publicó primero, siempre con enlace a la fuente original.</p>
+      <div class="steps" id="pasos"></div>
+    </div>
   </section>
   <footer><div class="wrap"><span id="gen"></span></div></footer>
 </div>
@@ -210,6 +223,9 @@ let MEDIOS=[];
 const color=m=>COLORES[m]||PAL[Math.max(0,MEDIOS.indexOf(m))%PAL.length];
 const badge=m=>`<span class="badge" style="background:${color(m)}">${esc(m)}</span>`;
 const D={};
+const nh=v=>v==null||v===''||isNaN(+v)?'–':String(Math.round(+v*10)/10);          // 1 decimal, sin .0 sobrante
+const fx=(v,d=2)=>v==null||v===''||isNaN(+v)?'–':(+v).toFixed(d);                  // decimales fijos
+const tms=f=>+new Date(f);                                                          // fecha a milisegundos
 let activos=new Set();
 
 async function getJSON(n,fresco){
@@ -238,6 +254,7 @@ function tab(id){
   $$('.panel').forEach(p=>p.classList.toggle('on',p.id===id));
   $$('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===id));
   if(location.hash!=='#'+id) history.replaceState(null,'','#'+id);
+  if(id==='historias'&&typeof renderGrafoGlobal==='function') renderGrafoGlobal();
 }
 $$('#nav button').forEach(b=>b.onclick=()=>tab(b.dataset.t));
 
@@ -258,13 +275,9 @@ function raiz(w){
     if(mapaStem.has(b)) return mapaStem.get(b);
     if(vocabIdx.has(b)) return b;
   }
-  if(w.length>=6){
-    const p=w.slice(0,Math.max(4,w.length-3));let best=null,bi=-1;
-    for(const t of D.indice.vocab) if(t.startsWith(p)){const v=D.indice.idf[vocabIdx.get(t)];if(v>bi){bi=v;best=t;}}
-    return best;
-  }
-  return null;
+  return null;   // palabra desconocida: no se adivina por prefijo (evita falsos parecidos)
 }
+const SIM_MIN=0.12;   // similitud mínima para considerar relevante una noticia
 function buscar(consulta){
   const rs=tokenizar(consulta).map(raiz).filter(r=>r&&vocabIdx.has(r));
   if(!rs.length) return null;
@@ -297,19 +310,23 @@ function preguntar(texto){
   texto=(texto||'').trim();if(!texto) return;
   addMsg('user',esc(texto));
   if(!activos.size){addMsg('bot','Activa al menos un medio para poder buscar.');return;}
-  const res=buscar(texto);
-  if(!res||!res.length){addMsg('bot','No encontré noticias sobre eso. Prueba con otras palabras o elige un tema sugerido.');return;}
-  const rel=res.filter(r=>r.s>=0.1),base=rel.length?rel:res.slice(0,5);
+  const desconocidas=tokenizar(texto).filter(w=>{const r=raiz(w);return !(r&&vocabIdx.has(r));});
+  const res=buscar(texto),base=(res||[]).filter(r=>r.s>=SIM_MIN);
+  if(!base.length){
+    addMsg('bot',`No encontré noticias relevantes sobre «${esc(texto)}» en la base actual.${desconocidas.length?' No reconozco: <b>'+esc(desconocidas.join(', '))+'</b>.':''} Prueba con otras palabras o elige un tema sugerido.`);
+    return;
+  }
   const por={};base.forEach(r=>{const m=D.noticias[r.id].m;por[m]=(por[m]||0)+1;});
   const cob=Object.entries(por).sort((a,b)=>b[1]-a[1]).map(([m,c])=>`<span class="badge" style="background:${color(m)}">${esc(m)}: ${c}</span>`).join(' ');
-  // historia más relacionada (suma de similitudes de las 12 mejores)
-  const sc={};res.slice(0,12).forEach(r=>{const h=D.noticias[r.id].h;if(h!=null) sc[h]=(sc[h]||0)+r.s;});
+  // historia más relacionada (suma de similitudes de las mejores noticias relevantes)
+  const sc={};base.slice(0,12).forEach(r=>{const h=D.noticias[r.id].h;if(h!=null) sc[h]=(sc[h]||0)+r.s;});
   const hid=Object.keys(sc).sort((a,b)=>sc[b]-sc[a])[0];
   // solo muestra la historia si la mejor noticia se parece lo suficiente a la consulta
-  const H=(hid!=null&&res[0].s>=0.15)?D.hist.find(h=>h.id==hid):null;
+  const H=(hid!=null&&base[0].s>=0.15)?D.hist.find(h=>h.id==hid):null;
   let html=`<p>Encontré <b>${base.length}</b> noticia(s) relacionada(s) con «${esc(texto)}». Cobertura por medio:</p><p>${cob}</p>`;
+  if(desconocidas.length) html+=`<p class="sub">No reconozco: ${esc(desconocidas.join(', '))} (se buscó con el resto).</p>`;
   if(H) html+=`<div class="note"><b>Historia relacionada:</b> ${esc(H.titulo)}<br>${esc(H.resumen)}<br><button class="btn sec" data-h="${H.id}">Ver cobertura comparada (${H.nm} medios) →</button></div>`;
-  html+=res.slice(0,5).map(tarjeta).join('');
+  html+=base.slice(0,5).map(tarjeta).join('');
   addMsg('bot',html);
 }
 function enviar(){const i=$('#q'),t=i.value;i.value='';preguntar(t);}
@@ -327,7 +344,7 @@ let histSel=null;
 function renderListaHistorias(){
   const min=+$('#hfiltro').value;
   const lista=D.hist.filter(h=>h.nm>=min);
-  $('#hlist').innerHTML=lista.map(h=>`<div class="hi ${h.id===histSel?'on':''}" data-h="${h.id}"><div class="t">${esc(h.titulo)}</div><div class="meta"><span>${h.nm} medios · ${h.n} notas</span><span>${esc(fmtD(h.fi))}${h.fi.slice(0,10)!==h.ff.slice(0,10)?' – '+esc(fmtD(h.ff)):''}</span></div></div>`).join('')||'<p class="sub">No hay historias con ese filtro.</p>';
+  $('#hlist').innerHTML=lista.map(h=>`<div class="hi ${h.id===histSel?'on':''}" data-h="${h.id}"><div class="t">${esc(h.titulo)}</div><div class="meta"><span>${h.nm} medios · ${h.n} notas</span><span>${esc(fmtD(h.fi))}${fmtD(h.fi)!==fmtD(h.ff)?' – '+esc(fmtD(h.ff)):''}</span></div></div>`).join('')||'<p class="sub">No hay historias con ese filtro.</p>';
   if(histSel==null&&lista.length) renderHistoria(lista[0].id);
 }
 function lineaTiempo(notas){
@@ -357,20 +374,134 @@ let MEDIOS_H=[];
 function renderHistoria(id){
   histSel=id;
   const h=D.hist.find(x=>x.id===id);if(!h) return;
-  const notas=h.notas.map(i=>D.noticias[i]).sort((a,b)=>a.f<b.f?-1:1);
+  const notas=h.notas.map(i=>D.noticias[i]).sort((a,b)=>tms(a.f)-tms(b.f));
   MEDIOS_H=[...new Set(notas.map(n=>n.m))].sort();
   const cols=MEDIOS_H.map(m=>{
     const ns=notas.filter(n=>n.m===m);
     return `<div class="col">${badge(m)} <small>${ns.length} nota(s)</small>${ns.map(n=>`<a href="${esc(urlOk(n.u))}" target="_blank" rel="noopener"><small>${esc(fmtF(n.f))}</small><br>${esc(n.t)}</a>`).join('')}</div>`;
   }).join('');
   $('#hdet').innerHTML=`<div class="card"><h2>${esc(h.titulo)}</h2>
-    <div class="meta">${h.medios.map(badge).join(' ')}<span>${h.n} notas</span><span>${esc(fmtD(h.fi))} – ${esc(fmtD(h.ff))}</span></div>
+    <div class="meta">${h.medios.map(badge).join(' ')}<span>${h.n} notas</span><span>${esc(fmtD(h.fi))}${fmtD(h.fi)!==fmtD(h.ff)?' – '+esc(fmtD(h.ff)):''}</span></div>
     <p>${esc(h.resumen)}</p><p>${h.palabras.map(p=>`<span class="tag">${esc(p)}</span>`).join(' ')}</p>
     <button class="btn sec" data-mapa="${h.id}">Ver en el mapa</button></div>
     <div class="card"><h3>Línea de tiempo de la cobertura</h3>${lineaTiempo(notas)}</div>
+    <div class="card"><h3>Grafo de esta historia</h3>${grafoHistoria(h)}</div>
     <div class="card"><h3>Cobertura comparada: cómo lo titula cada medio</h3><div class="cols">${cols}</div></div>`;
   $$('#hlist .hi').forEach(e=>e.classList.toggle('on',+e.dataset.h===id));
 }
+
+/* ===== grafo de similitud (se calcula en el navegador con el índice TF-IDF exportado por R) ===== */
+let VEC=null,GR=null,POS=null;
+const UM=()=>D.meta.umbral!=null?D.meta.umbral:0.30, VD=()=>D.meta.ventana_dias!=null?D.meta.ventana_dias:7;
+const PAL12=['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#17becf','#bcbd22','#7f7f7f','#393b79','#e6550d'];
+function vecs(){
+  if(!VEC) VEC=D.indice.docs.map(d=>{const m=new Map(),I=[].concat(d.i),W=[].concat(d.w);for(let k=0;k<I.length;k++) m.set(I[k],W[k]);return m;});
+  return VEC;
+}
+function simPar(a,b){
+  const [p,q]=a.size<=b.size?[a,b]:[b,a];let s=0;
+  p.forEach((w,k)=>{const v=q.get(k);if(v!==undefined) s+=w*v;});
+  return s;
+}
+function aristasEntre(ids){
+  const V=vecs(),N=D.noticias,um=UM(),vd=VD()*864e5,out=[];
+  for(let a=0;a<ids.length;a++) for(let b=a+1;b<ids.length;b++){
+    const i=ids[a],j=ids[b];
+    if(Math.abs(+new Date(N[i].f)-+new Date(N[j].f))>vd) continue;
+    const s=simPar(V[i],V[j]);if(s>=um) out.push([a,b,s]);
+  }
+  return out;
+}
+function layoutFuerza(pos,edges,W,H,iter){
+  const n=pos.length;if(!n) return;
+  const k=Math.sqrt(W*H/n)*0.8,rc2=(4*k)*(4*k);let t=W/10;
+  for(let it=0;it<iter;it++){
+    const dx=new Float64Array(n),dy=new Float64Array(n);
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){          // repulsión solo entre noticias cercanas
+      const ex=pos[i].x-pos[j].x,ey=pos[i].y-pos[j].y,d2=ex*ex+ey*ey+0.01;
+      if(d2>rc2) continue;
+      const f=k*k/d2;dx[i]+=ex*f;dy[i]+=ey*f;dx[j]-=ex*f;dy[j]-=ey*f;
+    }
+    for(const [a,b,s] of edges){                           // atracción entre noticias conectadas
+      const ex=pos[a].x-pos[b].x,ey=pos[a].y-pos[b].y,f=Math.sqrt(ex*ex+ey*ey)/k*(0.5+s*2);
+      dx[a]-=ex*f;dy[a]-=ey*f;dx[b]+=ex*f;dy[b]+=ey*f;
+    }
+    for(let i=0;i<n;i++){                                  // gravedad suave al centro: junta los grupos sueltos
+      dx[i]-=(pos[i].x-W/2)*0.12;dy[i]-=(pos[i].y-H/2)*0.12;
+      const d=Math.hypot(dx[i],dy[i])+0.01,m=Math.min(d,t);
+      pos[i].x+=dx[i]/d*m;pos[i].y+=dy[i]/d*m;
+    }
+    t*=0.96;
+  }
+  // reescala para ocupar todo el lienzo manteniendo las proporciones
+  let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  pos.forEach(p=>{x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);});
+  const pad=22,sc=Math.min((W-2*pad)/((x1-x0)||1),(H-2*pad)/((y1-y0)||1));
+  const ox=(W-(x1-x0)*sc)/2-x0*sc,oy=(H-(y1-y0)*sc)/2-y0*sc;
+  pos.forEach(p=>{p.x=p.x*sc+ox;p.y=p.y*sc+oy;});
+}
+function initGrafo(){
+  VEC=null;GR=null;POS=null;
+  $('#gum').textContent=UM().toFixed(2);$('#gvd').textContent=VD();
+  $('#gsel').innerHTML='<option value="">— ninguna —</option>'+D.hist.filter(h=>h.nm>=2).map(h=>`<option value="${h.id}">${esc(h.titulo.slice(0,70))} (${h.nm} medios)</option>`).join('');
+}
+function renderGrafoGlobal(){
+  if(!D.noticias) return;
+  const N=D.noticias,W=920,H=520;
+  if(!GR){
+    const todos=N.map((_,i)=>i);
+    const ed=aristasEntre(todos),deg=new Uint16Array(N.length);
+    ed.forEach(([a,b])=>{deg[a]++;deg[b]++;});
+    const ids=todos.filter(i=>deg[i]>0),idx=new Map(ids.map((id,k)=>[id,k]));
+    if(!ids.length){$('#grsvg').innerHTML='<p class="sub">Aún no hay noticias conectadas con este umbral.</p>';$('#grleg').innerHTML='';$('#grnote').innerHTML='';return;}
+    const xs=ids.map(i=>N[i].x),ys=ids.map(i=>N[i].y),x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+    POS=ids.map(i=>({x:30+(N[i].x-x0)/(x1-x0||1)*(W-60),y:H-30-(N[i].y-y0)/(y1-y0||1)*(H-60)}));
+    const ed2=ed.map(([a,b,s])=>[idx.get(a),idx.get(b),s]);
+    layoutFuerza(POS,ed2,W,H,140);
+    GR={ids,ed:ed2,aisladas:N.length-ids.length};
+  }
+  const modo=$('#gcol').value,sel=$('#gsel').value;
+  const enH=sel===''?null:new Set((D.hist.find(h=>h.id==sel)||{notas:[]}).notas);
+  const top=D.hist.filter(h=>h.nm>=3).slice(0,12),cH=new Map(top.map((h,k)=>[h.id,PAL12[k]]));
+  const pmax=Math.max(...N.map(n=>n.p));
+  let s=`<rect x="0" y="0" width="${W}" height="${H}" rx="10" fill="var(--soft)" fill-opacity=".5"/>`;
+  GR.ed.forEach(([a,b,w])=>{
+    const na=N[GR.ids[a]],nb=N[GR.ids[b]],dim=enH&&!(enH.has(na.id)&&enH.has(nb.id));
+    s+=`<line x1="${POS[a].x.toFixed(1)}" y1="${POS[a].y.toFixed(1)}" x2="${POS[b].x.toFixed(1)}" y2="${POS[b].y.toFixed(1)}" stroke="#8794ab" stroke-opacity="${dim?.05:.4}" stroke-width="${(0.6+w*2).toFixed(1)}"/>`;
+  });
+  GR.ids.forEach((id,k)=>{
+    const n=N[id],dim=enH&&!enH.has(id),r=2.5+6.5*Math.sqrt(n.p/pmax);
+    const fill=modo==='historia'?(cH.get(n.h)||'#a7b0c0'):color(n.m);
+    s+=`<circle class="gn" data-id="${id}" cx="${POS[k].x.toFixed(1)}" cy="${POS[k].y.toFixed(1)}" r="${r.toFixed(1)}" fill="${fill}" fill-opacity="${dim?.12:.9}" stroke="var(--panel)" stroke-width="${dim?0:1.2}" style="cursor:pointer" data-tip="${esc(n.m+' · '+fmtF(n.f)+'\n'+n.t)}"/>`;
+  });
+  $('#grsvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Grafo de similitud entre noticias">${s}</svg>`;
+  $('#grleg').innerHTML=modo==='historia'
+    ?top.map(h=>`<button class="chip" data-gh="${h.id}" style="border-color:${cH.get(h.id)}"><span style="color:${cH.get(h.id)}">●</span> ${esc(h.titulo.slice(0,38))}</button>`).join('')
+    :MEDIOS.map(m=>badge(m)).join(' ');
+  $('#grnote').innerHTML=`<b>${GR.ids.length}</b> noticias conectadas y <b>${GR.ed.length}</b> conexiones (similitud ≥ ${UM().toFixed(2)} y ≤ ${VD()} días). ${GR.aisladas} noticias quedaron sin conexión y no se dibujan. El tamaño del nodo es su PageRank; la posición se calcula con un algoritmo de fuerzas, partiendo del mapa 2D.`;
+}
+function grafoHistoria(h){
+  const N=D.noticias,ids=h.notas,W=760,Hh=380,ed=aristasEntre(ids);
+  const pos=ids.map((_,k)=>({x:W/2+Math.cos(2*Math.PI*k/ids.length)*W*0.3,y:Hh/2+Math.sin(2*Math.PI*k/ids.length)*Hh*0.3}));
+  layoutFuerza(pos,ed,W,Hh,220);
+  const pmax=Math.max(...N.map(n=>n.p));
+  let s='';
+  ed.forEach(([a,b,w])=>{s+=`<line x1="${pos[a].x.toFixed(1)}" y1="${pos[a].y.toFixed(1)}" x2="${pos[b].x.toFixed(1)}" y2="${pos[b].y.toFixed(1)}" stroke="#8794ab" stroke-opacity=".55" stroke-width="${(0.8+(w-UM())*8).toFixed(1)}" data-tip="${esc('similitud '+w.toFixed(2))}"/>`;});
+  ids.forEach((id,k)=>{
+    const n=N[id],rep=id===h.rep;
+    s+=`<a href="${esc(urlOk(n.u))}" target="_blank" rel="noopener"><circle cx="${pos[k].x.toFixed(1)}" cy="${pos[k].y.toFixed(1)}" r="${(5+9*Math.sqrt(n.p/pmax)).toFixed(1)}" fill="${color(n.m)}" fill-opacity=".92" stroke="${rep?'var(--tx)':'var(--panel)'}" stroke-width="${rep?3.5:1.5}" data-tip="${esc((rep?'★ Más representativa (mayor PageRank)\n':'')+n.m+' · '+fmtF(n.f)+'\n'+n.t)}"/></a>`;
+  });
+  return `<svg viewBox="0 0 ${W} ${Hh}" role="img" aria-label="Grafo de la historia"><rect x="0" y="0" width="${W}" height="${Hh}" rx="10" fill="var(--soft)" fill-opacity=".5"/>${s}</svg><p class="sub" style="margin-top:8px">${ids.length} noticias y ${ed.length} conexiones. Color = medio · tamaño = PageRank · borde grueso = noticia más representativa.</p>`;
+}
+document.addEventListener('click',e=>{
+  const gn=e.target.closest('.gn');
+  if(gn){const n=D.noticias[+gn.dataset.id];
+    $('#grdet').innerHTML=`<a class="res" href="${esc(urlOk(n.u))}" target="_blank" rel="noopener"><div class="meta">${badge(n.m)}<span>${esc(fmtF(n.f))}</span>${n.h!=null?'<span>historia #'+n.h+'</span>':''}</div><div class="ttl">${esc(n.t)}</div><div class="ext">${esc(n.r)}</div></a>`;return;}
+  const gh=e.target.closest('[data-gh]');
+  if(gh){$('#gsel').value=gh.dataset.gh;renderGrafoGlobal();}
+});
+$('#gcol').onchange=renderGrafoGlobal;
+$('#gsel').onchange=renderGrafoGlobal;
 
 /* ===== Mapa ===== */
 let mapSel='', mapOff=new Set();
@@ -411,7 +542,7 @@ function renderMapa(){
   aplicarVista();
   $('#mapleg').innerHTML=MEDIOS.map(m=>`<button class="chip ${mapOff.has(m)?'':'on'}" data-mm="${esc(m)}" style="${mapOff.has(m)?'':'background:'+color(m)+';border-color:'+color(m)}">${esc(m)}</button>`).join('');
   $('#msel').innerHTML='<option value="">— ninguna —</option>'+D.hist.filter(h=>h.nm>=2).map(h=>`<option value="${h.id}" ${String(h.id)===String(mapSel)?'selected':''}>${esc(h.titulo.slice(0,70))} (${h.nm} medios)</option>`).join('');
-  $('#mapnote').innerHTML=`Los dos ejes (PCA sobre el TF-IDF) explican solo el <b>${esc(D.meta.gof)}%</b> de la variabilidad: es normal en texto, que tiene miles de dimensiones. Úsalo para ver vecindades y grupos, no distancias exactas.`;
+  $('#mapnote').innerHTML=`Los dos ejes (PCA sobre el TF-IDF) explican solo el <b>${nh(D.meta.gof)}%</b> de la variabilidad: es normal en texto, que tiene miles de dimensiones. Úsalo para ver vecindades y grupos, no distancias exactas.`;
 }
 
 /* ===== Agenda y fuentes ===== */
@@ -432,18 +563,18 @@ function renderAgenda(){
     const mx=(sx+ex)/2-uy*26,my=(sy+ey)/2+ux*26,w=1+a.n*.55,c=color(a.to);
     const id='ar'+a.from.length+a.to.length+Math.round(sx);
     defs+=`<marker id="${id}" viewBox="0 0 12 12" refX="10" refY="6" markerUnits="userSpaceOnUse" markerWidth="13" markerHeight="13" orient="auto"><path d="M0 0 L12 6 L0 12 z" fill="${c}"/></marker>`;
-    s+=`<path d="M${sx.toFixed(1)} ${sy.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}" fill="none" stroke="${c}" stroke-opacity=".6" stroke-width="${w.toFixed(1)}" marker-end="url(#${id})" data-tip="${esc(a.from+' siguió a '+a.to+' en '+a.n+' historias\nrezago mediano: '+a.rezago+' h')}"/>`;
+    s+=`<path d="M${sx.toFixed(1)} ${sy.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${ex.toFixed(1)} ${ey.toFixed(1)}" fill="none" stroke="${c}" stroke-opacity=".6" stroke-width="${w.toFixed(1)}" marker-end="url(#${id})" data-tip="${esc(a.from+' siguió a '+a.to+' en '+a.n+' historias\nrezago mediano: '+nh(a.rezago)+' h')}"/>`;
   });
   nodos.forEach(n=>{
     const p=pos[n.id];
-    s+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${rad(n).toFixed(1)}" fill="${color(n.id)}" fill-opacity=".9" stroke="var(--panel)" stroke-width="3" data-tip="${esc(n.id+'\nauthority '+n.auth+' · hub '+n.hub+'\nprimicias: '+n.primicias+' de '+n.historias)}"/>
+    s+=`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${rad(n).toFixed(1)}" fill="${color(n.id)}" fill-opacity=".9" stroke="var(--panel)" stroke-width="3" data-tip="${esc(n.id+'\nauthority '+fx(n.auth)+' · hub '+fx(n.hub)+'\nprimicias: '+n.primicias+' de '+n.historias)}"/>
     <text x="${p.x.toFixed(1)}" y="${(p.y+rad(n)+16).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="700" style="paint-order:stroke;stroke:var(--panel);stroke-width:4px">${esc(n.id)}</text>
     <text class="mut" x="${p.x.toFixed(1)}" y="${(p.y+rad(n)+31).toFixed(1)}" text-anchor="middle" font-size="11">authority ${n.auth.toFixed(2)}</text>`;
   });
   $('#agsvg').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Red de agenda entre medios"><defs>${defs}</defs>${s}</svg>`;
   const ord=A.nodos.slice().sort((a,b)=>b.auth-a.auth);
   const bar=v=>`<div class="bar" style="margin:0"><span class="tr" style="flex:1;min-width:34px"><i style="width:${(v*100).toFixed(0)}%;background:var(--ac)"></i></span><span class="v">${v.toFixed(2)}</span></div>`;
-  $('#agtab').innerHTML=`<div class="tw"><table><thead><tr><th>Medio</th><th>Historias</th><th>Primicias</th><th>Authority</th><th>Hub</th></tr></thead><tbody>${ord.map(n=>`<tr><td>${badge(n.id)}</td><td>${n.historias}</td><td>${n.primicias} <small>(${n.pct_primicias==null?'–':n.pct_primicias+'%'})</small></td><td>${bar(n.auth)}</td><td>${bar(n.hub)}</td></tr>`).join('')}</tbody></table></div>`;
+  $('#agtab').innerHTML=`<div class="tw"><table><thead><tr><th>Medio</th><th>Historias</th><th>Primicias</th><th>Authority</th><th>Hub</th></tr></thead><tbody>${ord.map(n=>`<tr><td>${badge(n.id)}</td><td>${n.historias}</td><td>${n.primicias} <small>(${n.pct_primicias==null?'–':nh(n.pct_primicias)+'%'})</small></td><td>${bar(n.auth)}</td><td>${bar(n.hub)}</td></tr>`).join('')}</tbody></table></div>`;
   const lid=ord[0],prim=A.nodos.slice().sort((a,b)=>b.primicias-a.primicias)[0],hub=A.nodos.slice().sort((a,b)=>b.hub-a.hub)[0];
   $('#agnote').innerHTML=`<b>Lectura:</b> el medio más seguido por los demás (mayor authority) es <b>${esc(lid.id)}</b>; el que más primicias logra es <b>${esc(prim.id)}</b> (${prim.primicias}); el más reactivo (mayor hub) es <b>${esc(hub.id)}</b>. Se analizaron ${A.n_historias} historias con 2 o más medios. <br><b>Límite:</b> “primero” significa primero entre lo que se recolectó de las portadas; con pocos días de datos, las diferencias entre medios son indicativas, no definitivas.`;
   $('#agnote').className='note warn';
@@ -454,14 +585,14 @@ function renderAgenda(){
     const a=A.aristas.find(x=>x.to===l&&x.from===f);
     if(l===f||!a){h+=`<div style="background:var(--soft);opacity:.4">–</div>`;return;}
     const al=.15+.7*a.n/mx;
-    h+=`<div style="background:${color(l)}${Math.round(al*255).toString(16).padStart(2,'0')}" data-tip="${esc(f+' tarda '+a.rezago+' h (mediana) tras '+l+'\nen '+a.n+' historias')}"><b>${a.rezago} h</b><br><small>${a.n} hist.</small></div>`;});});
+    h+=`<div style="background:${color(l)}${Math.round(al*255).toString(16).padStart(2,'0')}" data-tip="${esc(f+' tarda '+nh(a.rezago)+' h (mediana) tras '+l+'\nen '+a.n+' historias')}"><b>${nh(a.rezago)} h</b><br><small>${a.n} hist.</small></div>`;});});
   $('#heat').innerHTML=h+'</div>';
   // fuentes citadas
   const RF=D.red;
   if(!RF||!RF.ok){$('#fuentes').innerHTML='<p class="sub">Aún no hay suficientes citas externas.</p>';return;}
   const cc={'Redes sociales':'#1f5f9e','Gobierno':'#2e7d4f','Prensa y otros':'#5a4a8c','Medio boliviano':'#9a4a1f'};
   const fs=RF.nodos.filter(n=>n.tipo==='fuente').sort((a,b)=>b.n-a.n).slice(0,12),mf=Math.max(...fs.map(f=>f.n));
-  $('#fuentes').innerHTML=`<p class="sub">Solo el <b>${RF.pct_con_citas}%</b> de las noticias enlaza a una fuente externa dentro del texto, por eso esta red es pequeña (${RF.total_fuentes} fuentes distintas). Los medios bolivianos casi no enlazan fuera.</p>`+
+  $('#fuentes').innerHTML=`<p class="sub">Solo el <b>${nh(RF.pct_con_citas)}%</b> de las noticias enlaza a una fuente externa dentro del texto, por eso esta red es pequeña (${RF.total_fuentes} fuentes distintas). Los medios bolivianos casi no enlazan fuera.</p>`+
     fs.map(f=>`<div class="bar"><span class="l">${esc(f.id)}</span><span class="tr"><i style="width:${(f.n/mf*100).toFixed(0)}%;background:${cc[f.cat]||'#667085'}"></i></span><span class="v">${f.n}</span></div>`).join('')+
     `<p class="sub">${Object.entries(cc).map(([k,c])=>`<span class="badge" style="background:${c}">${esc(k)}</span>`).join(' ')}</p>`;
 }
@@ -482,11 +613,11 @@ function renderTend(){
   [0,25,50,75,100].forEach(v=>{s+=`<line x1="${L}" x2="${W-Rr}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--bd)"/><text class="mut" x="${L-8}" y="${Y(v)+4}" text-anchor="end" font-size="11">${v}</text>`;});
   tr.forEach((r,i)=>{if(i%5===0) s+=`<text class="mut" x="${X(r.fecha)}" y="${Tp+plotH+16}" text-anchor="middle" font-size="11">${esc(fmtD(r.fecha+'T12:00:00'))}</text>`;});
   s+=`<polyline fill="none" stroke="#3b6fc4" stroke-width="2.5" points="${tr.map(r=>X(r.fecha).toFixed(1)+','+Y(r.interes).toFixed(1)).join(' ')}"/>`;
-  tr.forEach(r=>{s+=`<circle cx="${X(r.fecha)}" cy="${Y(r.interes)}" r="3" fill="#3b6fc4" data-tip="${esc('Google Trends · '+fmtD(r.fecha+'T12:00:00')+'\ninterés: '+r.interes)}"/>`;});
+  tr.forEach(r=>{s+=`<circle cx="${X(r.fecha)}" cy="${Y(r.interes)}" r="3" fill="#3b6fc4" data-tip="${esc('Google Trends · '+fmtD(r.fecha+'T12:00:00')+'\ninterés: '+nh(r.interes))}"/>`;});
   const val=cv.filter(r=>r.n_total>=MIN_NOTAS&&r.pct!=null&&Date.parse(r.fecha+'T12:00:00')>=d0),mxp=Math.max(1,...val.map(r=>r.pct));
   const yc=r=>Y(r.pct/mxp*100);
   if(val.length>1) s+=`<polyline fill="none" stroke="#b8731a" stroke-width="2.5" points="${val.map(r=>X(r.fecha).toFixed(1)+','+yc(r).toFixed(1)).join(' ')}"/>`;
-  val.forEach(r=>{s+=`<circle cx="${X(r.fecha)}" cy="${yc(r)}" r="5" fill="#9a4a1f" stroke="var(--panel)" stroke-width="2" data-tip="${esc('Cobertura · '+fmtD(r.fecha+'T12:00:00')+'\n'+r.pct+'% de '+r.n_total+' noticias ('+r.n+' mencionan «'+temaSel+'»)')}"/>`;});
+  val.forEach(r=>{s+=`<circle cx="${X(r.fecha)}" cy="${yc(r)}" r="5" fill="#9a4a1f" stroke="var(--panel)" stroke-width="2" data-tip="${esc('Cobertura · '+fmtD(r.fecha+'T12:00:00')+'\n'+nh(r.pct)+'% de '+r.n_total+' noticias ('+r.n+' mencionan «'+temaSel+'»)')}"/>`;});
   const tot=[...new Map(T.cobertura.map(r=>[r.fecha,r.n_total])).entries()].filter(([f])=>Date.parse(f+'T12:00:00')>=d0),mt=Math.max(1,...tot.map(x=>x[1]));
   const by=Tp+plotH+24;
   s+=`<text class="mut" x="${L}" y="${by+10}" font-size="11">Noticias recolectadas por día (barra gris; la cobertura se compara solo en días con ${MIN_NOTAS} o más)</text>`;
@@ -494,7 +625,7 @@ function renderTend(){
   $('#tsvg').innerHTML=`<svg viewBox="0 0 ${W} ${H+30}" role="img" aria-label="Google Trends frente a cobertura de los medios">${s}</svg>`;
   $('#tinfo').innerHTML=`<p><span class="badge" style="background:#3b6fc4">Interés en Google (0–100)</span> <span class="badge" style="background:#b8731a">Cobertura de los medios (% de noticias del día, escalada al máximo = 100)</span></p><div class="note warn">Fuente de Trends: ${esc(T.fuente)} (${esc(T.generado)}). Los datos de cobertura son recientes y se concentran en pocos días, así que la comparación mejora cada día que se actualiza el proyecto. Google Trends mide búsquedas de una palabra suelta; palabras con varios sentidos (como “papa”) mezclan significados.</div>`;
   const interp=r=>{if(r==null) return 'sin datos suficientes';const a=Math.abs(r);return (a>=.6?'fuerte ':a>=.3?'moderada ':'débil o nula ')+(a<.3?'':r>0?'positiva (suben juntos)':'negativa (van en sentido contrario)');};
-  $('#ttab').innerHTML=`<div class="tw"><table><thead><tr><th>Tema</th><th>Días comparados</th><th>Correlación</th><th>Lectura</th></tr></thead><tbody>${T.correlaciones.map(c=>`<tr><td><b>${esc(c.tema)}</b></td><td>${c.dias||0}</td><td>${c.correlacion==null?'–':c.correlacion}</td><td>${interp(c.correlacion)}${c.dias&&c.dias<10&&c.correlacion!=null?' <small>(con tan pocos días es solo indicativa)</small>':''}</td></tr>`).join('')}</tbody></table></div>`;
+  $('#ttab').innerHTML=`<div class="tw"><table><thead><tr><th>Tema</th><th>Días comparados</th><th>Correlación</th><th>Lectura</th></tr></thead><tbody>${T.correlaciones.map(c=>`<tr><td><b>${esc(c.tema)}</b></td><td>${c.dias||0}</td><td>${fx(c.correlacion)}</td><td>${interp(c.correlacion)}${c.dias&&c.dias<10&&c.correlacion!=null?' <small>(con tan pocos días es solo indicativa)</small>':''}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 /* ===== Bitácora y origen ===== */
@@ -561,14 +692,21 @@ async function cargar(recarga){
   Object.assign(D,{noticias,hist,meta,agenda,red,tend,bit,indice});
   MEDIOS=meta.por_medio.map(m=>m.medio).sort();activos=new Set(MEDIOS);histSel=null;
   prepararBusqueda();
-  const f=noticias.map(n=>n.f).sort();
+  const ult=Math.max(...noticias.map(n=>tms(n.f)));
   const multi=hist.filter(h=>h.nm>=3).length;
-  $('#kpis').innerHTML=[[meta.n_docs,'noticias analizadas'],[MEDIOS.length,'medios'],[meta.n_historias,'historias detectadas'],[multi,'cubiertas por 3+ medios'],[fmtD(f[f.length-1]),'última noticia']]
+  $('#kpis').innerHTML=[[meta.n_docs,'noticias analizadas'],[MEDIOS.length,'medios'],[meta.n_historias,'historias detectadas'],[multi,'cubiertas por 3+ medios'],[fmtD(ult),'última noticia']]
     .map(k=>`<div class="kpi"><b>${esc(k[0])}</b><span>${esc(k[1])}</span></div>`).join('');
-  renderAsistente();renderListaHistorias();renderMapa();renderAgenda();renderTend();renderBit();renderOrigen();
+  renderAsistente();initGrafo();renderListaHistorias();renderMapa();renderAgenda();renderTend();renderBit();renderOrigen();
   tab(location.hash.slice(1)||'asistente');
   return true;
 }
+setInterval(async()=>{
+  try{
+    const r=await fetch('data/meta.json?t='+Date.now(),{cache:'no-store'});if(!r.ok) return;
+    const m=await r.json();
+    if(D.meta&&m.generado!==D.meta.generado) $('#estado').innerHTML='Hay datos nuevos publicados. Pulsa «Actualizar datos».';
+  }catch(e){}
+},600000);
 $('#recargar').onclick=async()=>{
   const b=$('#recargar'),antes=D.meta?D.meta.generado:null;
   b.disabled=true;b.textContent='Actualizando...';$('#estado').textContent='';

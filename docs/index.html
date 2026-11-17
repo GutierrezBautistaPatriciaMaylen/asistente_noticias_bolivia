@@ -144,6 +144,8 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
       <p class="sub">Las noticias se conectan según su parecido (TF-IDF y coseno) y un algoritmo de comunidades (Louvain) detecta las historias. La noticia más representativa es la de mayor PageRank dentro del grafo.</p>
       <label>Mostrar: <select id="hfiltro"><option value="1">todas las historias</option><option value="3" selected>cubiertas por 3 o más medios</option><option value="5">cubiertas por los 5 medios</option></select></label>
     </div>
+    <div class="grid3"><div class="card"><div class="hl" id="hlist"></div></div><div id="hdet"></div></div>
+    <div id="hcob"></div>
     <div class="card"><h2>Cómo se detectan las historias: el grafo de similitud</h2>
       <p>Se construye un grafo: cada <b>nodo</b> es una noticia, y dos noticias se conectan si su similitud (TF-IDF y coseno) es al menos <b id="gum">0.30</b> y se publicaron con menos de <b id="gvd">7</b> días de diferencia. Sobre ese grafo se aplican dos algoritmos:</p>
       <ul><li><b>PageRank</b>, el algoritmo de Google, elige la noticia más representativa de cada grupo (es el tamaño del nodo).</li>
@@ -152,7 +154,6 @@ footer{padding:14px 0 36px;color:var(--foot);font-size:.85rem;font-weight:600;bo
       <label>Resaltar historia: <select id="gsel"></select></label>
       <div id="grsvg"></div><div id="grleg"></div><div id="grdet"></div><div class="note" id="grnote"></div>
     </div>
-    <div class="grid3"><div class="card"><div class="hl" id="hlist"></div></div><div id="hdet"></div></div>
   </section>
 
   <section class="panel" id="mapa">
@@ -385,8 +386,8 @@ function renderHistoria(id){
     <p>${esc(h.resumen)}</p><p>${h.palabras.map(p=>`<span class="tag">${esc(p)}</span>`).join(' ')}</p>
     <button class="btn sec" data-mapa="${h.id}">Ver en el mapa</button></div>
     <div class="card"><h3>Línea de tiempo de la cobertura</h3>${lineaTiempo(notas)}</div>
-    <div class="card"><h3>Grafo de esta historia</h3>${grafoHistoria(h)}</div>
-    <div class="card"><h3>Cobertura comparada: cómo lo titula cada medio</h3><div class="cols">${cols}</div></div>`;
+    <div class="card"><h3>Grafo de esta historia</h3>${grafoHistoria(h)}</div>`;
+  $('#hcob').innerHTML=`<div class="card"><h3>Cobertura comparada: cómo lo titula cada medio</h3><div class="cols">${cols}</div></div>`;
   $$('#hlist .hi').forEach(e=>e.classList.toggle('on',+e.dataset.h===id));
 }
 
